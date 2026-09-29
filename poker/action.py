@@ -22,17 +22,17 @@ class Action:
         self.amount = amount
 
     @staticmethod
-    def check():
+    def check() -> Action:
         return Action(Action.Kind.CHECK)
 
     @staticmethod
-    def call():
+    def call() -> Action:
         return Action(Action.Kind.CALL)
 
     @staticmethod
-    def raise_by(amount):
+    def raise_by(amount: int) -> Action:
         return Action(Action.Kind.RAISE, amount)
 
     @staticmethod
-    def fold():
+    def fold() -> Action:
         return Action(Action.Kind.FOLD)
