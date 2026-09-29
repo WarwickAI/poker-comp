@@ -1,3 +1,6 @@
+from rank import Rank
+from suit import Suit
+
 class Card:
     
     def __init__(self, rank: Rank, suit: Suit):
