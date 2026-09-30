@@ -56,3 +56,6 @@ class Action:
     
     def __eq__(self, other):
         return self.kind == other.kind and self.amount == other.amount if isinstance(other, Action) else NotImplemented
+    
+    def __hash__(self):
+        return hash((self.kind, self.amount))
