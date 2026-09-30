@@ -10,14 +10,20 @@ class Action:
 
     def __init__(self, kind: Action.Kind, amount: int | None = None):
         if not isinstance(kind, Action.Kind):
-            raise TypeError(f"Expected kind to be an Action.Kind, but it was a {type(kind).__name__}")
+            type_name = type(kind).__name__
+            article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
+            raise TypeError(f"Expected kind to be an Action.Kind, but it was {article} {type_name}")
         if kind is Action.Kind.RAISE:
             if not isinstance(amount, int):
-                raise TypeError(f"Expected amount to be an int, but it was a {type(amount).__name__}")
+                type_name = type(amount).__name__
+                article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
+                raise TypeError(f"Expected amount to be an int, but it was {article} {type_name}")
             if amount <= 0:
-                raise ValueError(f"Expected amount to be strictly positive, but it was {amount}")
+                raise ValueError(f"Expected amount to be greater than 0, but it was {amount}")
         elif amount is not None:
-            raise TypeError(f"Expected no amount, but got {amount}")
+            type_name = type(amount).__name__
+            article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
+            raise TypeError(f"Expected amount to be a None, but it was {article} {type_name}")
         self.kind = kind
         self.amount = amount
 
