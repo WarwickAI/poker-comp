@@ -42,3 +42,14 @@ class Action:
     @staticmethod
     def fold() -> Action:
         return Action(Action.Kind.FOLD)
+    
+    def __repr__(self):
+        match self.kind:
+            case Kind.CHECK:
+                return "Action.check()"
+            case Kind.CALL:
+                return "Action.call()"
+            case Kind.RAISE:
+                return f"Action.raise_by({self.amount})"
+            case Kind.FOLD:
+                return "Action.fold()"
