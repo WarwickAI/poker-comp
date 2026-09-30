@@ -45,13 +45,13 @@ class Action:
     
     def __repr__(self):
         match self.kind:
-            case Kind.CHECK:
+            case self.Kind.CHECK:
                 return "Action.check()"
-            case Kind.CALL:
+            case self.Kind.CALL:
                 return "Action.call()"
-            case Kind.RAISE:
+            case self.Kind.RAISE:
                 return f"Action.raise_by({self.amount})"
-            case Kind.FOLD:
+            case self.Kind.FOLD:
                 return "Action.fold()"
     
     def __eq__(self, other):
