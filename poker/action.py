@@ -53,3 +53,6 @@ class Action:
                 return f"Action.raise_by({self.amount})"
             case Kind.FOLD:
                 return "Action.fold()"
+    
+    def __eq__(self, other):
+        return self.kind == other.kind and self.amount == other.amount if isinstance(other, Action) else NotImplemented
