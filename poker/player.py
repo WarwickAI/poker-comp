@@ -2,11 +2,11 @@ class Player:
 
     def __init__(
         self,
-        chips: int = 0,
-        is_small_blind: bool = False,
-        is_big_blind: bool = False,
-        has_folded: bool = False,
-        chips_bet: int = 0
+        chips: int,
+        is_small_blind: bool,
+        is_big_blind: bool,
+        has_folded: bool,
+        chips_bet: int
     ):
         if not isinstance(chips, int):
             type_name = type(chips).__name__
