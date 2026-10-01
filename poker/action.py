@@ -24,7 +24,7 @@ class Action:
             if amount <= 0:
                 raise ValueError(f"Expected amount to be greater than 0, but it was {amount}")
             
-        elif amount is not None:
+        elif not isinstance(amount, None):
             type_name = type(amount).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
             raise TypeError(f"Expected amount to be a None, but it was {article} {type_name}")
