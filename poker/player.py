@@ -1,5 +1,8 @@
-from blind import Blind
+from enum import Enum
 
+class Blind(Enum):
+    SMALL = "small"
+    BIG = "big"
 
 class Player:
     def __init__(self, blind: Blind | None = None, has_folded: bool = False, chips_in_stack: int = 0, chips_bet: int = 0):
