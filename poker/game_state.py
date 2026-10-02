@@ -2,7 +2,7 @@ from player import Player
 from card import Card
 
 
-class State:
+class GameState:
 
     def __init__(self, players: list[Player], community_cards: list[Card], chips_in_pot: int):
         if not isinstance(players, list[Player]):
@@ -39,7 +39,7 @@ class State:
 
 
     def __eq__(self, other):
-        if not isinstance(other, State):
+        if not isinstance(other, GameState):
             return NotImplemented
 
         if self.players != other.players:
