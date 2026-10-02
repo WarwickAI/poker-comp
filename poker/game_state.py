@@ -7,12 +7,12 @@ class GameState:
         if not isinstance(my_player, Player):
             type_name = type(my_player).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected 'my_player' to be a Player, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'my_player' to be a Player, but it is {article} {type_name}")
             
         if not isinstance(players, list):
             type_name = type(players).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected 'players' to be a list, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'players' to be a list, but it is {article} {type_name}")
 
         for player in players:
             if not isinstance(player, Player):
@@ -23,12 +23,12 @@ class GameState:
         if not isinstance(chips_in_pot, int):
             type_name = type(chips_in_pot).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected 'chips_in_pot' to be an int, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'chips_in_pot' to be an int, but it is {article} {type_name}")
             
         if not isinstance(community_cards, list):
             type_name = type(community_cards).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected 'community_cards' to be a list, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'community_cards' to be a list, but it is {article} {type_name}")
 
         for card in community_cards:
             if not isinstance(card, Card):
