@@ -73,11 +73,11 @@ class Player:
 
 
 class MyPlayer(Player):
-    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):
-        if chips_in_stack < 1:
-            raise ValueError(f"Expected at least 1 chip in the stack, but there were 0")
-        
+    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):        
         super().__init__(blind=blind, has_folded=False, chips_in_stack=chips_in_stack, chips_bet=chips_bet)
+        
+        if chips_in_stack == 0:
+            raise ValueError("Expected at least 1 chip in the stack, but there were 0")
         
         if not isinstance(hole_cards, list):
             type_name = type(hole_cards).__name__
