@@ -24,6 +24,9 @@ class GameState:
             type_name = type(chips_in_pot).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
             raise TypeError(f"Expected 'chips_in_pot' to be an int, but it is {article} {type_name}")
+
+        if chips_in_pot < 0:
+            raise ValueError(f"Expected at least 0 chips in the pot, but got {chips_in_pot}")
             
         if not isinstance(community_cards, list):
             type_name = type(community_cards).__name__
