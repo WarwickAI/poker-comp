@@ -1,7 +1,10 @@
+from blind import Blind
+
+
 class Player:
     def __init__(self, blind: Blind | None = None, has_folded: bool = False, chips_in_stack: int = 0, chips_bet: int = 0):
         if not isinstance(blind, Blind) and not isinstance(blind, None):
-            type_name = type(is_small_blind).__name__
+            type_name = type(blind).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
             raise TypeError(f"Expected blind to be a Blind or a None, but it was {article} {type_name}")
         
