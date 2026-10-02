@@ -50,7 +50,7 @@ class Player: # Players hash and equate by object identity
 
 class MyPlayer(Player): # MyPlayers are only constructed when myAI is called which requires that the player can act
     def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):
-        if chips_in_stack < 1:
+        if chips_in_stack < 1: # chips_in_stack >= 1 as the player cannot act when all in
             raise ValueError(f"Expected at least 1 chip in the stack, but there were 0")
         
         super().__init__(blind, False, chips_in_stack, chips_bet) # has_folded is False as the player can act
