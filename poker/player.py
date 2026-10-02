@@ -52,10 +52,10 @@ class MyPlayer(Player): # MyPlayers are only constructed when myAI is called whi
     def __init__(self, blind: Blind | None = None, chips_in_stack: int = 0, chips_bet: int = 0, hole_cards: List[Card]):
         super().__init__(blind, False, chips_in_stack, chips_bet) # has_folded is False as the player can act
         
-        if not isinstance(hole_cards, List):
+        if not isinstance(hole_cards, list):
             type_name = type(hole_cards).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected 'hole_cards' to be a List, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'hole_cards' to be a list, but it was {article} {type_name}")
 
         for card in hole_cards:
             if not isinstance(card, Card):
@@ -65,7 +65,7 @@ class MyPlayer(Player): # MyPlayers are only constructed when myAI is called whi
 
         hole_card_count = len(hole_cards)
         if hole_card_count != 2:
-            raise ValueError(f"Expected 2 hole cards, but got {hole_cards_count}")
+            raise ValueError(f"Expected 2 hole cards, but got {hole_card_count}")
 
         if hole_cards[0] == hole_cards[1]:
             raise ValueError(f"Expected the hole cards to be different, but got {hole_cards[0]} twice")
