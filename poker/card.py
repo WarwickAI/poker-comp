@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Rank(Enum):
     TWO = "two"
     THREE = "three"
@@ -15,11 +16,13 @@ class Rank(Enum):
     KING = "king"
     ACE = "ace"
 
+
 class Suit(Enum):
     SPADE = "spade"
     HEART = "heart"
     DIAMOND = "diamond"
     CLUB = "club"
+
 
 class Card:
     def __init__(self, rank: Rank, suit: Suit):
