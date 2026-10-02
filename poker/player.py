@@ -76,9 +76,6 @@ class MyPlayer(Player):
     def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):        
         super().__init__(blind=blind, has_folded=False, chips_in_stack=chips_in_stack, chips_bet=chips_bet)
         
-        if not chips_in_stack:
-            raise ValueError("Expected at least 1 chip in the stack, but there were 0")
-        
         if not isinstance(hole_cards, list):
             type_name = type(hole_cards).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
