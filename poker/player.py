@@ -8,7 +8,7 @@ class Blind(Enum):
     BIG = "big"
 
 
-class Player:
+class Player: # Players hash and equate by object identity
     def __init__(self, blind: Blind | None = None, has_folded: bool = False, chips_in_stack: int = 0, chips_bet: int = 0):
         if not isinstance(blind, Blind) and not isinstance(blind, None):
             type_name = type(blind).__name__
