@@ -41,17 +41,20 @@ class GameState:
         if not isinstance(other, GameState):
             return NotImplemented
 
-        if self.players != other.players:
-                    return False
+        if self.my_player != other.my_player:
+            return False
 
-        if self.community_cards != other.community_cards:
-                    return False
+        if self.players != other.players:
+            return False
 
         if self.chips_in_pot != other.chips_in_pot:
+            return False
+
+        if self.community_cards != other.community_cards:
             return False
 
         return True
 
 
     def __hash__(self):
-        return hash((tuple(self.players), self.chips_in_pot, tuple(self.community_cards)))
+        return hash((self.my_player, tuple(self.players), self.chips_in_pot, tuple(self.community_cards)))
