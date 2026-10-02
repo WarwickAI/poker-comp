@@ -6,14 +6,14 @@ class Card:
         if not isinstance(rank, Rank):
             type_name = type(rank).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected rank to be a Rank, but it was {article} {type_name}")
+            raise TypeError(f"Expected the rank to be a Rank, but it was {article} {type_name}")
             
         self.rank = rank
         
         if not isinstance(suit, Suit):
             type_name = type(suit).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected suit to be a Suit, but it was {article} {type_name}")
+            raise TypeError(f"Expected the suit to be a Suit, but it was {article} {type_name}")
         
         self.suit = suit
     
