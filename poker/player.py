@@ -9,7 +9,7 @@ class Player:
         if not isinstance(blind, Blind) and not isinstance(blind, None):
             type_name = type(blind).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected the blind to be a Blind or a None, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'blind' to be a Blind or a None, but it was {article} {type_name}")
         
         self.blind = blind
 
@@ -23,7 +23,7 @@ class Player:
         if not isinstance(chips_in_stack, int):
             type_name = type(chips_in_stack).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected the chips in the stack to be an int, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'chips_in_stack' to be an int, but it was {article} {type_name}")
 
         if chips_in_stack < 0:
             raise ValueError(f"Expected at least 0 chips in the stack, but there were {chips_in_stack}")
@@ -33,7 +33,7 @@ class Player:
         if not isinstance(chips_bet, int):
             type_name = type(chips_bet).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected the chips bet to be an int, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'chips_bet' to be an int, but it was {article} {type_name}")
 
         if chips_bet < 0:
             raise ValueError(f"Expected at least 0 chips bet, but there were {chips_bet}")
