@@ -49,7 +49,7 @@ class Player: # Players hash and equate by object identity
 
 
 class MyPlayer(Player): # MyPlayers are only constructed when myAI is called which requires that the player can act
-    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int = 0, chips_bet: int = 0, hole_cards: List[Card]):
+    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int = 0, chips_bet: int = 0, hole_cards: list[Card]):
         super().__init__(blind, False, chips_in_stack, chips_bet) # has_folded is False as the player can act
         
         if not isinstance(hole_cards, list):
