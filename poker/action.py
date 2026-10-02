@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Action:
     class Kind(Enum):
         CHECK = "check"
