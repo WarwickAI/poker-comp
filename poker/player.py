@@ -9,7 +9,7 @@ class Blind(Enum):
 
 
 class Player: # Players hash and equate by object identity
-    def __init__(self, blind: Blind | None = None, has_folded: bool = False, chips_in_stack: int = 0, chips_bet: int = 0):
+    def __init__(self, *, blind: Blind | None = None, has_folded: bool = False, chips_in_stack: int = 0, chips_bet: int = 0):
         if not isinstance(blind, Blind) and not isinstance(blind, None):
             type_name = type(blind).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
@@ -49,7 +49,10 @@ class Player: # Players hash and equate by object identity
 
 
 class MyPlayer(Player): # MyPlayers are only constructed when myAI is called which requires that the player can act
-    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int = 0, chips_bet: int = 0, hole_cards: list[Card]):
+    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):
+        if chips_in_stack < 1:
+            raise ValueError(f"Expected at least 1 chip in the stack, but there were 0")
+        
         super().__init__(blind, False, chips_in_stack, chips_bet) # has_folded is False as the player can act
         
         if not isinstance(hole_cards, list):
