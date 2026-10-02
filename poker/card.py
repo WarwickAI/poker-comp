@@ -1,5 +1,12 @@
 from rank import Rank
-from suit import Suit
+
+from enum import Enum
+
+class Suit(Enum):
+    SPADE = "spade"
+    HEART = "heart"
+    DIAMOND = "diamond"
+    CLUB = "club"
 
 class Card:
     def __init__(self, rank: Rank, suit: Suit):
