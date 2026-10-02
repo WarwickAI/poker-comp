@@ -8,7 +8,7 @@ class Blind(Enum):
     BIG = "big"
 
 
-class Player: # Players hash and equate by object identity
+class Player:
     def __init__(self, *, blind: Blind | None = None, has_folded: bool = False, chips_in_stack: int = 0, chips_bet: int = 0):
         if not isinstance(blind, Blind) and not isinstance(blind, None):
             type_name = type(blind).__name__
@@ -47,6 +47,27 @@ class Player: # Players hash and equate by object identity
     def __repr__(self):
         return f"Player(blind={self.blind}, has_folded={self.has_folded}, chips_in_stack={self.chips_in_stack}, chips_bet={self.chips_bet})"
 
+    def __eq__(self, other):
+        if not isinstance(other, Player):
+            return NotImplemented
+
+        if self.blind != other.blind:
+            return False
+
+        if self.has_folded != other.has_folded:
+            return False
+
+        if self.chips_in_stack != other.chips_in_stack:
+            return False
+
+        if self.chips_bet != other.chips_bet:
+            return False
+
+        return True
+
+    def __hash__(self):
+        return hash((self.blind, self.has_folded, self.chips_in_stack, self.chips_bet))
+
 
 class MyPlayer(Player): # MyPlayers are only constructed when myAI is called which requires that the player can act
     def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):
@@ -77,3 +98,27 @@ class MyPlayer(Player): # MyPlayers are only constructed when myAI is called whi
 
     def __repr__(self):
         return f"MyPlayer(blind={self.blind}, chips_in_stack={self.chips_in_stack}, chips_bet={self.chips_bet}, hole_cards={self.hole_cards})"
+
+    def __eq__(self, other):
+        if not isinstance(other, Player):
+            return NotImplemented
+
+        if self.blind != other.blind:
+            return False
+
+        if self.has_folded != other.has_folded:
+            return False
+
+        if self.chips_in_stack != other.chips_in_stack:
+            return False
+
+        if self.chips_bet != other.chips_bet:
+            return False
+
+        if self.chips_bet != other.chips_bet:
+            return False
+
+        return True
+
+    def __hash__(self):
+        return hash((self.blind, self.has_folded, self.chips_in_stack, self.chips_bet))
