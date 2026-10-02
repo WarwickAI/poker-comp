@@ -38,4 +38,4 @@ class Player:
 
 
     def __repr__(self):
-        return f"Player({self.blind}, {self.has_folded}, {self.chips_in_stack}, {self.chips_bet})"
+        return f"Player(blind={self.blind}, has_folded={self.has_folded}, chips_in_stack={self.chips_in_stack}, chips_bet={self.chips_bet})"
