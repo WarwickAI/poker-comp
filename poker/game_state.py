@@ -4,33 +4,30 @@ from card import Card
 
 class GameState:
     def __init__(self, *, my_player: Player, players: list[Player], chips_in_pot: int = 0, community_cards: list[Card] = []):
-        if not isinstance(players, list[Player]):
+        if not isinstance(my_player, Player):
+            type_name = type(my_player).__name__
+            article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
+            raise TypeError(f"Expected 'my_player' to be a Player, but it was {article} {type_name}")
+            
+        if not isinstance(players, list):
             type_name = type(players).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected players to be a list, but it was {article} {type_name}")
-
-        if len(players) < 2:
-            raise ValueError(f"Expected players to have a length of at least 2, but it had a length of {len(players)}")
-
-        if not isinstance(community_cards, list[Card]):
-            type_name = type(community_cards).__name__
-            article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected community_cards to be a list, but it was {article} {type_name}")
-
-        if len(community_cards) not in [0, 3, 4, 5]:
-            raise ValueError(f"Expected community_cards to have a length of 0, 3, 4, or 5, but it had a length of {len(community_cards)}")
-        
+            raise TypeError(f"Expected 'players' to be a list, but it was {article} {type_name}")
+            
         if not isinstance(chips_in_pot, int):
             type_name = type(chips_in_pot).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected chips_in_pot to be an int, but it was {article} {type_name}")
+            raise TypeError(f"Expected 'chips_in_pot' to be an int, but it was {article} {type_name}")
+            
+        if not isinstance(community_cards, list):
+            type_name = type(community_cards).__name__
+            article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
+            raise TypeError(f"Expected 'community_cards' to be a list, but it was {article} {type_name}")
 
-        if chips_in_pot <= 0:
-            raise ValueError(f"Expected chips_in_pot to be greater than 0, but it was {chips_in_pot}")
-
+        self.my_player = my_player
+        self.players = players
         self.chips_in_pot = chips_in_pot
         self.community_cards = community_cards
-        self.players = players
 
 
     def __repr__(self):
