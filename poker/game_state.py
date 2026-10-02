@@ -40,7 +40,7 @@ class GameState:
                 raise TypeError(f"Expected 'community_cards' to be a list of Cards, but {card} is {article} {type_name}")
 
         if chips_in_pot and not community_cards:
-            raise ValueError(f"Expected the pot to be empty if there are no community cards")
+            raise ValueError("Expected the pot to be empty if there are no community cards")
 
         self.my_player = my_player
         self.players = players
