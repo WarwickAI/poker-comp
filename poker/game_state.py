@@ -3,7 +3,7 @@ from card import Card
 
 
 class GameState:
-    def __init__(self, *, players: list[Player], chips_in_pot: int = 0, community_cards: list[Card] = []):
+    def __init__(self, *, my_player: Player, players: list[Player], chips_in_pot: int = 0, community_cards: list[Card] = []):
         if not isinstance(players, list[Player]):
             type_name = type(players).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
@@ -34,7 +34,7 @@ class GameState:
 
 
     def __repr__(self):
-        return f"GameState(players={self.players}, chips_in_pot={self.chips_in_pot}, community_cards={self.community_cards})"
+        return f"GameState(my_player={self.my_player}, players={self.players}, chips_in_pot={self.chips_in_pot}, community_cards={self.community_cards})"
 
 
     def __eq__(self, other):
