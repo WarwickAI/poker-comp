@@ -2,16 +2,16 @@ from enum import Enum
 
 class Action:
     class Kind(Enum):
-        CHECK
-        CALL
-        RAISE
-        FOLD
+        CHECK = "check"
+        CALL = "call"
+        RAISE = "raise"
+        FOLD = "fold"
 
     def __init__(self, kind: Action.Kind, amount: int | None = None):
         if not isinstance(kind, Action.Kind):
             type_name = type(kind).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected kind to be an Action.Kind, but it was {article} {type_name}")
+            raise TypeError(f"Expected the kind to be an Action.Kind, but it was {article} {type_name}")
 
         self.kind = kind
         
@@ -19,15 +19,15 @@ class Action:
             if not isinstance(amount, int):
                 type_name = type(amount).__name__
                 article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-                raise TypeError(f"Expected amount to be an int, but it was {article} {type_name}")
+                raise TypeError(f"Expected the amount to be an int, but it was {article} {type_name}")
             
             if amount <= 0:
-                raise ValueError(f"Expected amount to be greater than 0, but it was {amount}")
+                raise ValueError(f"Expected the amount to be greater than 0, but it was {amount}")
             
         elif not isinstance(amount, None):
             type_name = type(amount).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected amount to be a None, but it was {article} {type_name}")
+            raise TypeError(f"Expected the amount to be a None, but it was {article} {type_name}")
         
         self.amount = amount
 
