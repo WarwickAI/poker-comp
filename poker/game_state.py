@@ -39,6 +39,9 @@ class GameState:
                 article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
                 raise TypeError(f"Expected 'community_cards' to be a list of Cards, but {card} is {article} {type_name}")
 
+        if chips_in_pot and not community_cards:
+            raise ValueError(f"Expected the pot to be empty if there are no community cards")
+
         self.my_player = my_player
         self.players = players
         self.chips_in_pot = chips_in_pot
