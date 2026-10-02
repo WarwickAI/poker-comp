@@ -3,8 +3,7 @@ class Player:
     def __init__(
         self,
         chips: int,
-        is_small_blind: bool,
-        is_big_blind: bool,
+        blind: Blind | None = None,
         has_folded: bool,
         chips_bet: int
     ):
@@ -16,18 +15,10 @@ class Player:
         if chips < 0:
             raise ValueError(f"Expected chips to be at least 0, but it was {chips}")
         
-        if not isinstance(is_small_blind, bool):
+        if not isinstance(blind, Blind) and not isinstance(blind, None):
             type_name = type(is_small_blind).__name__
             article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected is_small_blind to be a bool, but it was {article} {type_name}")
-        
-        if not isinstance(is_big_blind, bool):
-            type_name = type(is_big_blind).__name__
-            article = "an" if type_name.startswith(('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')) else "a"
-            raise TypeError(f"Expected is_big_blind to be a bool, but it was {article} {type_name}")
-
-        if is_small_blind and is_big_blind:
-            raise ValueError("Expected at most one of is_small_blind and is_big_blind to be True")
+            raise TypeError(f"Expected blind to be a Blind or a None, but it was {article} {type_name}")
 
         if not isinstance(has_folded, bool):
             type_name = type(has_folded).__name__
@@ -43,14 +34,13 @@ class Player:
             raise ValueError(f"Expected chips_bet to be at least 0, but it was {chips_bet}")
 
         self.chips = chips
-        self.is_small_blind = is_small_blind
-        self.is_big_blind = is_big_blind
+        self.blind = blind
         self.has_folded = has_folded
         self.chips_bet = chips_bet
 
 
     def __repr__(self):
-        return f"Player({self.chips}, {self.is_small_blind}, {self.is_big_blind}, {self.has_folded}, {self.chips_bet})"
+        return f"Player({self.chips}, {self.blind}, {self.has_folded}, {self.chips_bet})"
 
 
     def __eq__(self, other):
@@ -60,10 +50,7 @@ class Player:
         if self.chips != other.chips:
             return False
 
-        if self.is_small_blind != other.is_small_blind:
-            return False
-
-        if self.is_big_blind != other.is_big_blind:
+        if self.blind != other.blind:
             return False
 
         if self.has_folded != other.has_folded:
@@ -76,5 +63,5 @@ class Player:
 
 
     def __hash__(self):
-        return hash((self.chips, self.is_small_blind, self.is_big_blind, self.has_folded, self.chips_bet))
+        return hash((self.chips, self.blind, self.has_folded, self.chips_bet))
     
