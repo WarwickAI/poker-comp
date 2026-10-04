@@ -44,7 +44,7 @@ class Player:
 
 
 class MyPlayer(Player):
-    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: list[Card]):        
+    def __init__(self, *, blind: Blind | None = None, chips_in_stack: int, chips_bet: int = 0, hole_cards: set[Card]):        
         super().__init__(blind=blind, has_folded=False, chips_in_stack=chips_in_stack, chips_bet=chips_bet)
         self.hole_cards = hole_cards
 
