@@ -1,4 +1,4 @@
-# 🐍 Warwick AI Snake Competition 🏆
+# ♥️♠️ Warwick AI Poker Competition 🏆
 
 <div align="center">
 
