@@ -1,10 +1,6 @@
 # ♠️ Warwick AI Poker Competition 🏆
 
-<div align="center">
-
-<img width="452" height="449" alt="snakebr" src="https://github.com/user-attachments/assets/b60db513-3873-4d71-a567-10dcb9d06f86" />
-
-### 🎮 **Welcome to the first ever WAI AI Programming Competition!** 🎮
+### 🎮 **Welcome to the second ever WAI AI Programming Competition!** 🎮
 
 [![Competition Status](https://img.shields.io/badge/Status-Active-brightgreen)](https://warwick.ai)
 [![Week](https://img.shields.io/badge/Deadline-Week%209%20Term%201-orange)](https://warwick.ai)
@@ -21,8 +17,8 @@ Don't worry if you're new to programming or AI, there's something here for every
 ### 🎯 Competition Highlights
 
 - 🗺️ **Format:** Squad up in teams of any size!
-- 🧠 **Duration:** Running officially till week 9 of term 1
-- 💰 **Prize:** The winning team will receive a £50 Tesco Voucher + eternal WAI glory
+- 🧠 **Duration:** Running officially till week 10 of term 1
+- 💰 **Prize:** The winning team will receive whatever sam says they will + eternal WAI glory
 - 📊 **Leaderboard:** Live updates on our website throughout the competition
 - 🏆 **Final Testing:** We'll do thorough testing for final results
 
