@@ -3,7 +3,7 @@ from card import Card
 
 
 class GameState:
-    def __init__(self, *, my_player: Player, players: list[Player], chips_in_pot: int = 0, community_cards: list[Card] = []):
+    def __init__(self, *, my_player: Player, players: list[Player], chips_in_pot: int = 0, community_cards: set[Card] = []):
         self.my_player = my_player
         self.players = players
         self.chips_in_pot = chips_in_pot
