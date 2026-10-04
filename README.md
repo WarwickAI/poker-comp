@@ -1,4 +1,4 @@
-# ♥️♠️ Warwick AI Poker Competition ♦️♣️
+# Warwick AI Poker Competition 🏆
 
 <div align="center">
 
