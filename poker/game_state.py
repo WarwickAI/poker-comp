@@ -1,13 +1,13 @@
-from player import Player
-from card import Card
+from .player import Player
+from .card import Card
 
 
 class GameState:
-    def __init__(self, *, my_player: Player, players: list[Player], chips_in_pot: int = 0, community_cards: set[Card] = []):
+    def __init__(self, *, my_player: Player, players: list[Player], chips_in_pot: int = 0, community_cards: set[Card] | None = None):
         self.my_player = my_player
         self.players = players
         self.chips_in_pot = chips_in_pot
-        self.community_cards = community_cards
+        self.community_cards = community_cards if community_cards is not None else set()
 
 
     def __repr__(self):
@@ -34,4 +34,4 @@ class GameState:
 
 
     def __hash__(self):
-        return hash((self.my_player, tuple(self.players), self.chips_in_pot, tuple(self.community_cards)))
+        return hash((self.my_player, tuple(self.players), self.chips_in_pot, frozenset(self.community_cards)))

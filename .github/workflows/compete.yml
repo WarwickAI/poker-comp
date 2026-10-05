@@ -8,4 +8,4 @@ jobs:
       - name: Score WAI Competition Project
         uses: WarwickAI/competitions@v1.0.0
         with:
-          project: 'snake'
+          project: 'poker'

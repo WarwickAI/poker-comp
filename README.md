@@ -79,34 +79,48 @@ If you don't have a development environment set up, an alternative is making a g
 Please note, command line tools will not work from a github codespace, instead the code must be run locally.
 
 ---
-<!--
+
 ## 🎯 Running the Game
 
-### Available Commands
+Installing the project gives you a `poker` command, which plays AIs against each other. An AI is any python file with a `myAI` function, and there are a few simple ones to play against in the `bots` folder. Between 2 and 8 AIs can play.
 
-#### 📋 List all difficulties
+#### 👀 Watch a match
 ```bash
-snake list
+poker run myAI.py bots/caller.py bots/tight.py
 ```
 
-#### 👀 Watch your AI play
-```bash
-snake run easy
-snake run hard
-```
+This opens a window and plays a match in it, showing everyone's cards, the bets and what each AI does. The window can be resized, and adding `--fullscreen` starts it filling the screen.
+
+| Key | What it does |
+|---|---|
+| `SPACE` | Pause and resume |
+| `LEFT` / `RIGHT` | Step backwards and forwards |
+| `UP` / `DOWN` | Speed up and slow down |
+| `N` | Skip to the next hand |
+| `F` | Switch between a window and fullscreen |
+| `R` | Restart the match |
+| `ESC` | Quit |
 
 #### ⚡ Run headless tests
 ```bash
-snake test 100 medium
-snake test 50 all  # cycles through every difficulty
+poker test 100 myAI.py bots/caller.py bots/chaos.py bots/tight.py
 ```
+
+This plays 100 matches without showing them, and prints how each AI did.
 
 #### 🎲 Deterministic testing
 ```bash
-snake run hard --seed 123
-snake test 100 hard --seed 69
+poker run myAI.py bots/chaos.py --seed 123
+poker test 100 myAI.py bots/chaos.py --seed 69
 ```
--->
+
+#### 🆚 Comparing versions of your AI
+```bash
+poker run new=myAI.py old=old/myAI.py bots/tight.py
+```
+
+Writing `NAME=PATH` chooses the name an AI is shown with. Run `poker run --help` to see the other options, such as `--hands`, `--stack` and `--blinds`.
+
 ---
 
 ## 🧠 Writing Your AI
@@ -117,11 +131,20 @@ Your submission is the `myAI` function in `myAI.py`:
 ```python
 def myAI(state: GameState) -> Action:
     # Your bot goes here!
-    return Action.raise_by(999999)
+    return defaultAI(state)
 ```
 
 Your AI function should use the current state of the game `state` and output an `Action` of type of `CHECK`, `CALL`, `RAISE` or `FOLD`·
 These can be constructed using `Action.check()`, `Action.call()`, `Action.raise_by(amount: int)` or `Action.fold()`.
+
+### The Rules
+
+The game is no-limit Texas hold'em. Everyone starts a match with the same number of chips, and a player who runs out is out of the match.
+
+- `chips_bet` is how many chips a player has put in during the current betting round, so the amount you need to call is the biggest `chips_bet` at the table minus your own. `chips_in_pot` is everything bet in the hand so far.
+- `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more. If that is less than the minimum raise it is brought up to it, and if it is more than you have then you go all in.
+- `Action.call()` when you can't afford the bet puts you all in.
+- If your AI raises an exception, takes too long, doesn't return an `Action` or checks when there is a bet to call, then it checks if it can and folds if it can't, the same as `defaultAI`.
 
 ### Some Inspiration
 
@@ -153,6 +176,9 @@ Other than this, have fun and see you at code nights!
 - Weekly code nights
 - Visit [warwick.ai](https://warwick.ai)
 - Message us with questions
+
+### Credits
+The card and chip art is from the [(Pixel) Poker Cards](https://ivoryred.itch.io/pixel-poker-cards) pack by IvoryRed, used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ---
 
