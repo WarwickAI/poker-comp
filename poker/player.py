@@ -1,6 +1,6 @@
 from enum import Enum
 
-from card import Card
+from .card import Card
 
 
 class Blind(Enum):
@@ -76,4 +76,4 @@ class MyPlayer(Player):
         return True
 
     def __hash__(self):
-        return hash((self.blind, self.has_folded, self.chips_in_stack, self.chips_bet, tuple(self.hole_cards)))
+        return hash((self.blind, self.has_folded, self.chips_in_stack, self.chips_bet, frozenset(self.hole_cards)))
