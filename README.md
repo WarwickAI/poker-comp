@@ -121,6 +121,13 @@ poker run new=myAI.py old=old/myAI.py bots/tight.py
 
 Writing `NAME=PATH` chooses the name an AI is shown with. Run `poker run --help` to see the other options, such as `--hands`, `--stack` and `--blinds`.
 
+#### 📜 Trying different rules
+```bash
+poker run myAI.py bots/tight.py --rules my_rules.yaml
+```
+
+The rules of a match, such as how many chips everyone starts with and how quickly the blinds go up, are in `poker/rules.yaml`. To try different ones, copy that file, change the copy, and pass it with `--rules`. Your copy only needs the lines which are different.
+
 ---
 
 ## 🧠 Writing Your AI
@@ -140,6 +147,10 @@ These can be constructed using `Action.check()`, `Action.call()`, `Action.raise_
 ### The Rules
 
 The game is no-limit Texas hold'em. Everyone starts a match with the same number of chips, and a player who runs out is out of the match.
+
+As in a tournament, the blinds go up as the match goes on. They go up a level every 3 orbits, which is 3 hands for each player still in, and each level is between 25% and 50% more than the last: 10/20, 15/30, 20/40, 30/60, 40/80, 50/100, 75/150, 100/200 and so on.
+
+All of these numbers are set in `poker/rules.yaml`, along with rules which are turned off to begin with, like antes.
 
 - `chips_bet` is how many chips a player has put in during the current betting round, so the amount you need to call is the biggest `chips_bet` at the table minus your own. `chips_in_pot` is everything bet in the hand so far.
 - `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more. There is no minimum raise, and if it is more than you have then you go all in.

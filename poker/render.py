@@ -34,7 +34,7 @@ POT = (500, 376)
 
 SPEEDS = [0.5, 1, 2, 4, 8, 16]
 ANIMATION = 0.35  # Seconds spent moving cards and chips at the start of each thing that happens
-HOLDS = {"deal": 0.7, "blind": 0.3, "fold": 0.5, "check": 0.5, "call": 0.6, "raise": 0.8, "return": 0.6, "street": 0.9, "showdown": 1.2, "win": 1.8, "bust": 1.0}
+HOLDS = {"deal": 0.7, "ante": 0.4, "blind": 0.3, "fold": 0.5, "check": 0.5, "call": 0.6, "raise": 0.8, "return": 0.6, "street": 0.9, "showdown": 1.2, "win": 1.8, "bust": 1.0}
 
 CONTROLS = "SPACE pause    LEFT / RIGHT step    UP / DOWN speed    N next hand    F fullscreen    R restart    ESC quit"
 
@@ -401,7 +401,12 @@ class PokerRenderer:
             if frame["problem"]:
                 self.log_lines += [(index, "problem", line) for line in self.wrap(f"! Default action used: {frame['problem']}", 10, WIDTH - TABLE_WIDTH - 32)]
 
-            if frame["kind"] == "win":
+            if frame["kind"] == "ante":
+                for was, left in zip(hand["frames"][index - 1]["stacks"], frame["stacks"]):
+                    for kind, count in self.chips_for(was - left):
+                        chips[kind] = chips.get(kind, 0) + count
+
+            elif frame["kind"] == "win":
                 # Whoever wins takes their share of every kind of chip
                 left = self.held(frame)
                 chips = {kind: -(-count * left // held) for kind, count in chips.items()} if left else {}
@@ -440,6 +445,14 @@ class PokerRenderer:
                 # Chips which nobody called go back to the player. The rest are pushed into the pot, or straight to the winner if the hand is over.
                 target = home if now["kind"] == "return" and now["seat"] == seat else winner or POT
                 self.draw_pill(f"{was - bet:,}", lerp(spot[0], target[0], amount), lerp(spot[1], target[1], amount), 1 - amount ** 3, self.chips_for(was - bet))
+
+        if now["kind"] == "ante" and amount < 1:
+            for seat in range(len(self.players)):
+                home = self.around(seat, *SEATS)
+                paid = before["stacks"][seat] - now["stacks"][seat]
+
+                if paid > 0:
+                    self.draw_pill(f"{paid:,}", lerp(home[0], POT[0], amount), lerp(home[1], POT[1], amount), 1 - amount ** 3, self.chips_for(paid))
 
         # Chips on their way to the pot only join it once they get there, and chips which have been won leave it straight away
         pot_before = self.pot_chips[self.frame - 1] if self.frame > 0 else {}
@@ -483,6 +496,7 @@ class PokerRenderer:
 
         y += 14
         rl.draw_text(f"HAND {hand['number']} OF {self.total_hands}", left, y, 10, self.MUTED)
+        self.draw_text_right(f"BLINDS {hand['blinds'][0]}/{hand['blinds'][1]}" + (f"   ANTE {hand['ante']}" if hand["ante"] else ""), right, y, 10, self.MUTED)
         y += 18
 
         # The newest lines stay in view, and older ones scroll off the top
