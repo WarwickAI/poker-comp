@@ -6,7 +6,10 @@ import random
 import sys
 from pathlib import Path
 
+import yaml
+
 from .engine import AI, Match
+from .rules import Rules
 
 
 MAX_PLAYERS = 8
@@ -75,11 +78,36 @@ def positive(text: str) -> int:
     return value
 
 
-def new_match(args: argparse.Namespace, ais: list[tuple[str, AI]]) -> Match:
+def load_rules(args: argparse.Namespace) -> Rules:
+    # The rules come from poker/rules.yaml or the file given with --rules, and then the command line can change a few of them
+    try:
+        rules = Rules(args.rules)
+
+        if args.hands is not None:
+            rules.hands = args.hands
+
+        if args.stack is not None:
+            rules.stack = args.stack
+
+        if args.blinds is not None:
+            rules.small_blind, rules.big_blind = args.blinds
+
+        if args.timeout is not None:
+            rules.timeout = args.timeout
+
+        rules.check()
+
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as e:
+        raise SystemExit(f"poker: the rules can't be used: {e}")
+
+    return rules
+
+
+def new_match(args: argparse.Namespace, ais: list[tuple[str, AI]], rules: Rules) -> Match:
     if args.seed is not None:
         random.seed(args.seed)  # For AIs which use the random module
 
-    return Match(ais=ais, stack=args.stack, small_blind=args.blinds[0], big_blind=args.blinds[1], seed=args.seed, timeout=args.timeout)
+    return Match(ais=ais, rules=rules, seed=args.seed)
 
 
 def print_standings(match: Match):
@@ -93,24 +121,25 @@ def print_standings(match: Match):
 
 def run(args: argparse.Namespace):
     ais = load_ais(args.ais)
+    rules = load_rules(args)
 
     from .render import CONTROLS, PokerRenderer  # Imported here so that poker test works without a screen
 
     print(f"Controls: {CONTROLS}")
-    match = new_match(args, ais)
-    renderer = PokerRenderer(players=[name for name, _ in ais], total_hands=args.hands, fullscreen=args.fullscreen)
+    match = new_match(args, ais, rules)
+    renderer = PokerRenderer(players=[name for name, _ in ais], total_hands=rules.hands, fullscreen=args.fullscreen)
 
     # The main loop runs whilst the window is open, playing each hand just before it is shown
     while renderer.is_window_open():
         if renderer.should_restart():
-            match = new_match(args, ais)
+            match = new_match(args, ais, rules)
             renderer.reset()
 
         if renderer.needs_hand():
             match.play_hand(len(match.hands) + 1)
             renderer.push(match.hands[-1])
 
-            if len(match.hands) >= args.hands or match.is_over():
+            if len(match.hands) >= rules.hands or match.is_over():
                 renderer.finish()
 
         renderer.update()
@@ -121,6 +150,7 @@ def run(args: argparse.Namespace):
 
 def test(args: argparse.Namespace):
     ais = load_ais(args.ais)
+    rules = load_rules(args)
     rng = random.Random(args.seed)
 
     chips = {name: 0 for name, _ in ais}
@@ -134,8 +164,8 @@ def test(args: argparse.Namespace):
         if seed is not None:
             random.seed(seed)
 
-        match = Match(ais=rng.sample(ais, len(ais)), stack=args.stack, small_blind=args.blinds[0], big_blind=args.blinds[1], seed=seed, timeout=args.timeout)  # Seats are shuffled every match
-        match.play(args.hands)
+        match = Match(ais=rng.sample(ais, len(ais)), rules=rules, seed=seed)  # Seats are shuffled every match
+        match.play()
 
         standings = match.standings()
         leaders = [seat for seat in standings if seat.stack == standings[0].stack]
@@ -149,7 +179,7 @@ def test(args: argparse.Namespace):
             wins[seat.name] += 1 / len(leaders)
 
     width = max(len(name) for name in chips)
-    print(f"{args.matches} matches of up to {args.hands} hands")
+    print(f"{args.matches} matches of up to {rules.hands} hands")
     print(f"{'AI':<{width}}  {'Won':>6}  {'Avg chips':>9}  {'Avg place':>9}  {'Bad actions':>11}")
 
     for name in sorted(chips, key=lambda name: (wins[name], chips[name]), reverse=True):  # Best win rate first, then most chips
@@ -158,11 +188,12 @@ def test(args: argparse.Namespace):
 
 def main(argv: list[str] | None = None):
     options = argparse.ArgumentParser(add_help=False)
-    options.add_argument("--hands", type=positive, default=100, help="most hands to play in a match (default: 100)")
-    options.add_argument("--stack", type=positive, default=1000, help="chips each AI starts with (default: 1000)")
-    options.add_argument("--blinds", type=parse_blinds, default=(10, 20), metavar="SMALL/BIG", help="the blinds (default: 10/20)")
+    options.add_argument("--rules", metavar="FILE", help="a yaml file of rules to play by, like poker/rules.yaml. It only needs the rules which are different")
+    options.add_argument("--hands", type=positive, help="most hands to play in a match, in place of what the rules say")
+    options.add_argument("--stack", type=positive, help="chips each AI starts with, in place of what the rules say")
+    options.add_argument("--blinds", type=parse_blinds, metavar="SMALL/BIG", help="the blinds at the start, like 10/20, in place of what the rules say")
+    options.add_argument("--timeout", type=float, metavar="SECONDS", help="how long an AI gets for each action, or 0 for no limit, in place of what the rules say")
     options.add_argument("--seed", type=int, help="makes the cards the same every time")
-    options.add_argument("--timeout", type=float, default=1.0, metavar="SECONDS", help="how long an AI gets for each action, or 0 for no limit (default: 1)")
 
     ais_help = f"path to a python file with a myAI function, or NAME=PATH to choose the name it is shown with (2 to {MAX_PLAYERS} of them)"
 
