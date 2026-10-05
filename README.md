@@ -141,7 +141,7 @@ Every week at code night, your latest bot will compete against all other submitt
 
 ---
 
-## 🚨 Important
+## Important!!!
 
 Don't change anything in the poker folder!
 
