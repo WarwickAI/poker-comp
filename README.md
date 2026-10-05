@@ -133,7 +133,7 @@ There's all sorts of ways to write an AI for this competition:
 
 ---
 
-## 🏆 Submitting you AI
+## 🏆 Submitting your AI
 
 To submit your AI, simply push a commit to your repository. 
 
