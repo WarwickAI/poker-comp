@@ -81,7 +81,6 @@ class Match:
         self.frames: list[dict] = []
         self.pot = 0
         self.current_bet = 0
-        self.min_raise = big_blind
 
     def play(self, hands: int):
         for number in range(1, hands + 1):
@@ -121,7 +120,6 @@ class Match:
         self.frames = []
         self.pot = 0
         self.current_bet = 0
-        self.min_raise = self.big_blind
 
         small, big = (dealt[1], dealt[0]) if len(dealt) == 2 else (dealt[0], dealt[1])  # Heads-up, the button is the small blind
         small.blind = Blind.SMALL
@@ -156,7 +154,6 @@ class Match:
                 seat.bet = 0
 
             self.current_bet = 0
-            self.min_raise = self.big_blind
 
             cards = [deck.pop() for _ in range(count)]
             self.board += cards
@@ -261,11 +258,10 @@ class Match:
             text, label = f"calls {paid}", f"Call {paid}"
 
         else:
-            # A raise is by `amount` on top of the bet being called. It is brought up to the minimum raise, and down to the player's stack.
-            amount = min(max(action.amount, self.min_raise), most)
+            # A raise is by `amount` on top of the bet being called. There is no smallest raise, and a raise of more than the player has puts them all in.
+            amount = min(action.amount, most)
             opening = self.current_bet == 0
             self.put_in(seat, to_call + amount)
-            self.min_raise = max(self.min_raise, amount)
             self.current_bet = seat.bet
             text, label = (f"bets {seat.bet}", f"Bet {seat.bet}") if opening else (f"raises to {seat.bet}", f"Raise {seat.bet}")
 
