@@ -142,7 +142,7 @@ These can be constructed using `Action.check()`, `Action.call()`, `Action.raise_
 The game is no-limit Texas hold'em. Everyone starts a match with the same number of chips, and a player who runs out is out of the match.
 
 - `chips_bet` is how many chips a player has put in during the current betting round, so the amount you need to call is the biggest `chips_bet` at the table minus your own. `chips_in_pot` is everything bet in the hand so far.
-- `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more. If that is less than the minimum raise it is brought up to it, and if it is more than you have then you go all in.
+- `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more. There is no minimum raise, and if it is more than you have then you go all in.
 - `Action.call()` when you can't afford the bet puts you all in.
 - If your AI raises an exception, takes too long, doesn't return an `Action` or checks when there is a bet to call, then it checks if it can and folds if it can't, the same as `defaultAI`.
 
