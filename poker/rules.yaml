@@ -13,7 +13,7 @@ blinds:
 
 # Every so often the blinds go up a level, as they do in a tournament.
 # Say how often in orbits or in hands, and leave the other as 0. Leaving both as 0 keeps the blinds the same all match.
-# An orbit is one hand for each player still in, so it gets shorter as players go out.
+# An orbit completes after every player still in has had the button. Player eliminations do not recalculate past orbit progress.
 blinds_go_up:
   every_orbits: 3
   every_hands: 0
@@ -28,8 +28,9 @@ chips_cut:
   every_hands: 0
   share: 0.25
 
-# From a given hand on, everyone pays an ante into the pot at the start of every hand, on top of the blinds.
+# From a given orbit on, everyone pays an ante into the pot at the start of every hand, on top of the blinds.
+# An orbit completes once every player still in has had the button.
 # An ante of 0 chips turns this off.
 ante:
   chips: 0
-  from_hand: 1
+  from_orbit: 1

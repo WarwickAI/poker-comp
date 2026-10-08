@@ -76,6 +76,10 @@ class Match:
         self.blind_level = 0
         self.hands_at_level = 0
         self.hands_since_cut = 0
+        self.orbits_completed = 0
+        self.orbits_at_level = 0
+        self.orbits_since_cut = 0
+        self.buttons_this_orbit: set[int] = set()
         self.timeout = self.rules.timeout
 
         self.rng = random.Random(seed)
@@ -103,27 +107,31 @@ class Match:
 
     def play_hand(self, number: int):
         rules = self.rules
-        players = sum(seat.stack > 0 for seat in self.seats)
         happened = ""
 
-        # An orbit is one hand for each player still in, so things which happen every so many orbits come round sooner as players go out
-        if 0 < rules.cut_every_orbits * players + rules.cut_every_hands <= self.hands_since_cut:
+        if (rules.cut_every_orbits and rules.cut_every_orbits <= self.orbits_since_cut) or (
+            rules.cut_every_hands and rules.cut_every_hands <= self.hands_since_cut
+        ):
             self.hands_since_cut = 0
+            self.orbits_since_cut = 0
             happened += f", and everyone loses {rules.cut_share:.0%} of their chips"
 
             for seat in self.seats:
                 seat.stack -= int(seat.stack * rules.cut_share)  # Rounded down, so that nobody is put out by it
 
-        if 0 < rules.blinds_up_every_orbits * players + rules.blinds_up_every_hands <= self.hands_at_level:
+        if (rules.blinds_up_every_orbits and rules.blinds_up_every_orbits <= self.orbits_at_level) or (
+            rules.blinds_up_every_hands and rules.blinds_up_every_hands <= self.hands_at_level
+        ):
             self.blind_level += 1
             self.hands_at_level = 0
+            self.orbits_at_level = 0
             scale = rules.blind_levels[self.blind_level % len(rules.blind_levels)] / rules.blind_levels[0] * 10 ** (self.blind_level // len(rules.blind_levels))
             self.small_blind, self.big_blind = (int(blind * scale + 0.5) for blind in (rules.small_blind, rules.big_blind))
             happened += f", and the blinds go up to {self.small_blind}/{self.big_blind}"
 
         self.hands_at_level += 1
         self.hands_since_cut += 1
-        ante = rules.ante if number >= rules.ante_from_hand else 0
+        ante = rules.ante if self.orbits_completed >= rules.ante_from_orbit - 1 else 0
         total_chips = sum(seat.stack for seat in self.seats)
 
         for seat in self.seats:
@@ -212,6 +220,13 @@ class Match:
                 self.frame("bust", f"{seat.name} is out", seat=seat, label="Out")
 
         assert self.pot == 0 and sum(seat.stack for seat in self.seats) == total_chips, "Chips were created or destroyed"
+        self.buttons_this_orbit.add(self.button)
+
+        if all(seat.stack == 0 or index in self.buttons_this_orbit for index, seat in enumerate(self.seats)):
+            self.orbits_completed += 1
+            self.orbits_at_level += 1
+            self.orbits_since_cut += 1
+            self.buttons_this_orbit.clear()
 
     def dealt_from(self, start: int) -> list[Seat]:
         # The players in this hand, in the order they act, starting from the given seat

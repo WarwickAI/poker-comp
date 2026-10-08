@@ -32,7 +32,7 @@ class Rules:
         self.cut_share: float = rules["chips_cut"]["share"]
 
         self.ante: int = rules["ante"]["chips"]
-        self.ante_from_hand: int = rules["ante"]["from_hand"]
+        self.ante_from_orbit: int = rules["ante"]["from_orbit"]
 
         self.check()
 
@@ -85,4 +85,4 @@ class Rules:
 
         number("share in chips_cut", self.cut_share, 0, 1)
         whole("chips in ante", self.ante, 0)
-        whole("from_hand in ante", self.ante_from_hand, 1)
+        whole("from_orbit in ante", self.ante_from_orbit, 1)
