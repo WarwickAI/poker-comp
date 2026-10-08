@@ -4,12 +4,12 @@
 # A copy only needs the lines which are different, and everything else is taken from here.
 
 hands: 100    # A match stops after this many hands, if more than one player is still in
-stack: 1000   # The chips each player starts with
+stack: 200   # The chips each player starts with
 timeout: 1    # The seconds a player gets for each action, or 0 for no limit
 
 blinds:
-  small: 10
-  big: 20
+  small: 1
+  big: 2
 
 # Every so often the blinds go up a level, as they do in a tournament.
 # Say how often in orbits or in hands, and leave the other as 0. Leaving both as 0 keeps the blinds the same all match.
