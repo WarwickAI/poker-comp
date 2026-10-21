@@ -7,7 +7,9 @@ import importlib.util
 import json
 import random
 import sys
-from dataclasses import dataclass
+import time
+from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -199,9 +201,11 @@ def print_standings(tournament: Tournament):
     tables = len(tournament.tables)
     print(f"Played {tournament.hands_played()} hands" + (f" across {tables} tables" if tables > 1 else ""))
 
-    print(f"    {'Player':<20} {'Chips':>8} {'Peak chips':>11} {'Score':>6}")
+    standings = tournament.standings()
+    width = max(20, *(len(result.name) for result in standings))  # Wide enough for every name
+    print(f"    {'Player':<{width}} {'Chips':>8} {'Peak chips':>11} {'Score':>6}")
 
-    for result in tournament.standings():
+    for result in standings:
         notes = []
 
         if result.hand is not None:
@@ -210,7 +214,7 @@ def print_standings(tournament: Tournament):
         if result.errors:
             notes.append(f"{result.errors} bad actions")
 
-        print(f"{result.place:>2}. {result.name:<20} {result.stack:>8} {result.peak:>11} {result.score:>6}" + (f"  ({', '.join(notes)})" if notes else ""))
+        print(f"{result.place:>2}. {result.name:<{width}} {result.stack:>8} {result.peak:>11} {result.score:>6}" + (f"  ({', '.join(notes)})" if notes else ""))
 
     out = tournament.out()
 
@@ -220,7 +224,7 @@ def print_standings(tournament: Tournament):
 
         for number, result in enumerate(out, start=1):
             where = f"hand {result.hand}" + (f" at table {result.table}" if tables > 1 else "")
-            print(f"{number:>2}. {result.name:<20} {where:<22} finished {ordinal(result.place)} with peak chips of {result.peak}, scoring {result.score}")
+            print(f"{number:>2}. {result.name:<{width}} {where:<22} finished {ordinal(result.place)} with peak chips of {result.peak}, scoring {result.score}")
 
 
 def ordinal(number: int) -> str:
@@ -261,9 +265,9 @@ def load_players(args: argparse.Namespace, rules: Rules) -> tuple[list[tuple[str
 
         raise SystemExit(f"poker: expected at least 2 AIs, but there were {len(ais)}")
 
-    if args.snapshots:
-        # Seats are drawn at random, as in a real tournament, and the same seed draws them the same way
-        random.Random(args.seed).shuffle(ais)
+    # The seats are drawn at random once, before the first hand, so that nobody always sits next to the same players. They stay
+    # the same for every match after that, and when a match is restarted. The same seed draws them the same way.
+    random.Random(args.seed).shuffle(ais)
 
     return ais, teams, sandbox
 
@@ -359,6 +363,9 @@ def watch(args: argparse.Namespace, ais: list[tuple[str, AI]], teams: dict[str, 
 
                 deal_to_waiting()
 
+            elif isinstance(message, tuple) and message[0] == "controls":
+                windows.share_controls(number, *message[1:])
+
             elif message == "restart":
                 tournament = new_tournament(args, ais, rules)
                 told = {}
@@ -394,13 +401,29 @@ def test(args: argparse.Namespace):
             sandbox.stop()
 
 
-def play_matches(args: argparse.Namespace, ais: list[tuple[str, AI]], rules: Rules):
-    rng = random.Random(args.seed)
+@dataclass
+class Record:
+    # How one AI did across every match poker test played
+    wins: float = 0.0
+    places: int = 0
+    scores: int = 0
+    peaks: int = 0
+    chips: int = 0
+    hands: int = 0  # Hands it lasted
+    errors: int = 0
+    asked: int = 0
+    thinking: float = 0.0
+    slowest: float = 0.0
+    actions: Counter = field(default_factory=Counter)
+    problems: Counter = field(default_factory=Counter)
 
-    chips = {name: 0 for name, _ in ais}
-    wins = {name: 0.0 for name, _ in ais}
-    places = {name: 0 for name, _ in ais}
-    errors = {name: 0 for name, _ in ais}
+
+def play_matches(args: argparse.Namespace, ais: list[tuple[str, AI]], rules: Rules):
+    # Every match is played with the same seats, which load_players drew. Each one has its own cards and dealer button.
+    records = {name: Record() for name, _ in ais}
+    lengths: list[int] = []
+    durations: list[float] = []
+    seating: list[list[str]] = []
 
     for number in range(args.matches):
         seed = None if args.seed is None else args.seed + number
@@ -408,28 +431,137 @@ def play_matches(args: argparse.Namespace, ais: list[tuple[str, AI]], rules: Rul
         if seed is not None:
             random.seed(seed)
 
-        tournament = Tournament(ais=rng.sample(ais, len(ais)), rules=rules, seed=seed)  # Seats are shuffled every match
+        tournament = Tournament(ais=ais, rules=rules, seed=seed)
+        seating = seating or [[seat.name for seat in table.match.seats] for table in tournament.tables]
+        started = time.perf_counter()
         tournament.play()
+        durations.append(time.perf_counter() - started)
 
+        length = max(table.hands_played() for table in tournament.tables)
+        lengths.append(length)
         standings = tournament.standings()
         leaders = [result for result in standings if result.stack == standings[0].stack]
 
         for result in standings:
-            chips[result.name] += result.stack
-            places[result.name] += result.place
-            errors[result.name] += result.errors
+            record, seat = records[result.name], result.seat
+            record.places += result.place
+            record.scores += result.score
+            record.peaks += result.peak
+            record.chips += result.stack
+            record.hands += result.hand if result.hand is not None else length
+            record.errors += result.errors
+            record.asked += seat.asked
+            record.thinking += seat.thinking
+            record.slowest = max(record.slowest, seat.slowest)
+            record.actions.update(seat.actions)
+            record.problems.update(seat.problems)
 
         for result in leaders:
-            wins[result.name] += 1 / len(leaders)
+            records[result.name].wins += 1 / len(leaders)
 
-    width = max(len(name) for name in chips)
-    tables = -(-len(ais) // TABLE_SIZE)
+    print_records(args, rules, records, seating, lengths, durations)
+
+
+def describe_rules(rules: Rules) -> str:
+    parts = [f"{rules.stack:,} chips each"]
+    blinds = f"blinds from {rules.small_blind}/{rules.big_blind}"
+
+    if rules.blinds_up_every_hands:
+        blinds += f", up a level every {rules.blinds_up_every_hands} hands"
+    elif rules.blinds_up_every_orbits:
+        blinds += f", up a level every {rules.blinds_up_every_orbits} orbit" + ("s" if rules.blinds_up_every_orbits > 1 else "")
+
+    parts.append(blinds)
+
+    if rules.ante:
+        parts.append(f"antes from level {rules.ante_from_level}" if rules.ante_from_level else f"antes from orbit {rules.ante_from_orbit}" if rules.ante_from_orbit else "antes from the first hand")
+
+    if rules.cut_every_hands or rules.cut_every_orbits:
+        every = f"{rules.cut_every_hands} hands" if rules.cut_every_hands else f"{rules.cut_every_orbits} orbits"
+        parts.append(f"{rules.cut_share:.0%} of everyone's chips cut every {every}")
+
+    parts.append(f"{rules.timeout:g}s for each action" if rules.timeout else "no time limit")
+    return ", ".join(parts)
+
+
+def duration(seconds: float) -> str:
+    if seconds >= 1:
+        return f"{seconds:.2f}s"
+
+    milliseconds = seconds * 1000
+    return f"{milliseconds:.2f}ms" if milliseconds < 10 else f"{milliseconds:.0f}ms"
+
+
+def print_records(args: argparse.Namespace, rules: Rules, records: dict[str, Record], seating: list[list[str]], lengths: list[int], durations: list[float]):
+    matches = args.matches
+    tables = len(seating)
+    width = max(len("AI"), *(len(name) for name in records))
+
+    # What was played
     length = (f"of up to {rules.hands} hands" + (" a table" if tables > 1 else "")) if rules.hands else "played until one AI has every chip"
-    print(f"{args.matches} matches {length}" + (f", starting on {tables} tables" if tables > 1 else ""))
-    print(f"{'AI':<{width}}  {'Won':>6}  {'Avg chips':>9}  {'Avg place':>9}  {'Bad actions':>11}")
+    print(f"{matches} match{'es' if matches > 1 else ''} of {len(records)} AIs" + (f", starting on {tables} tables" if tables > 1 else "") + f", {length}")
+    print(f"Rules: {describe_rules(rules)}")
+    print(f"Matches lasted {sum(lengths) / matches:.0f} hands on average ({min(lengths)} to {max(lengths)}), and took {duration(sum(durations) / matches)} each")
+    print("Seats, which stay the same in every match:")
 
-    for name in sorted(chips, key=lambda name: (wins[name], chips[name]), reverse=True):  # Best win rate first, then most chips
-        print(f"{name:<{width}}  {wins[name] / args.matches:>6.1%}  {chips[name] / args.matches:>9.1f}  {places[name] / args.matches:>9.2f}  {errors[name]:>11}")
+    for number, names in enumerate(seating, start=1):
+        print((f"  Table {number}: " if tables > 1 else "  ") + ", ".join(names))
+
+    if args.seed is None:
+        print("The seats and cards are drawn at random, so add --seed to play the same matches again")
+    else:
+        print(f"Seed {args.seed}, so the same command plays the same matches again")
+
+    # How well each AI did, with the best average score first
+    print()
+    ending = rules.hands > 0  # When a match can stop with chips spread out, the chips left at the end say something too
+    print(f"{'AI':<{width}}  {'Won':>6}  {'Avg place':>9}  {'Avg score':>9}  {'Avg peak':>8}" + (f"  {'Avg chips':>9}" if ending else "") + f"  {'Avg hands':>9}  {'Bad actions':>11}")
+    order = sorted(records, key=lambda name: (records[name].scores, records[name].wins), reverse=True)
+
+    for name in order:
+        record = records[name]
+        print(f"{name:<{width}}  {record.wins / matches:>6.1%}  {record.places / matches:>9.2f}  {record.scores / matches:>9.1f}  {record.peaks / matches:>8.1f}" + (f"  {record.chips / matches:>9.1f}" if ending else "") + f"  {record.hands / matches:>9.1f}  {record.errors:>11}")
+
+    players = len(records)
+    print(f"Score is the weekly tournament's: peak chips + 10 x ({players} players + 1 - place). Avg hands is how many hands an AI lasted.")
+
+    # How each AI played
+    print()
+    print(f"{'AI':<{width}}  {'Actions':>7}  {'Fold':>5}  {'Check':>5}  {'Call':>5}  {'Raise':>5}  {'All in':>6}  {'Avg time':>8}  {'Slowest':>7}")
+
+    for name in order:
+        record = records[name]
+        asked = record.asked or 1
+        shares = "  ".join(f"{record.actions[kind] / asked:>{size}.0%}" for kind, size in (("fold", 5), ("check", 5), ("call", 5), ("raise", 5), ("all in", 6)))
+        print(f"{name:<{width}}  {record.asked / matches:>7.1f}  {shares}  {duration(record.thinking / asked):>8}  {duration(record.slowest):>7}")
+
+    print("Actions is how many an AI made in a match, on average, and the rest are shares of them. A bad action is played as a check or a fold.")
+
+    # Why the bad actions happened, with the most common reasons first
+    print()
+    troubled = [name for name in order if records[name].problems]
+
+    if not troubled:
+        print("No AI made a bad action")
+        return
+
+    print("Why the bad actions happened")
+
+    for name in troubled:
+        reasons = Counter()
+
+        for reason, count in records[name].problems.items():
+            reasons[" ".join(reason.split())[:100]] += count  # Each on one line
+
+        reasons = reasons.most_common()
+        count_width = len(str(reasons[0][1]))
+
+        for index, (reason, count) in enumerate(reasons[:3]):
+            print(f"  {name if index == 0 else '':<{width}}  {count:>{count_width}}  {reason}")
+
+        if len(reasons) > 3:
+            others = sum(count for _, count in reasons[3:])
+            print(f"  {'':<{width}}  {others:>{count_width}}  for {len(reasons) - 3} other reason{'s' if len(reasons) > 4 else ''}")
 
 
 def score(args: argparse.Namespace):
@@ -446,7 +578,7 @@ def main(argv: list[str] | None = None):
     options.add_argument("--timeout", type=float, metavar="SECONDS", help="how long an AI gets for each action, or 0 for no limit, in place of what the rules say")
 
     seeded = argparse.ArgumentParser(add_help=False, parents=[options])
-    seeded.add_argument("--seed", type=int, help="makes the cards the same every time")
+    seeded.add_argument("--seed", type=int, help="makes the seats and the cards the same every time")
 
     ais_help = f"path to a python file with a myAI function, or NAME=PATH to choose the name it is shown with (at least 2, and more than {TABLE_SIZE} are split between tables)"
 

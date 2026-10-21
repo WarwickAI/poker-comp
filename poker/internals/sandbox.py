@@ -62,6 +62,7 @@ def state_to_json(state: GameState) -> dict:
         "players": [
             {
                 "me": player is state.my_player,
+                "id": player.id,
                 "blind": player.blind.value if player.blind else None,
                 "has_folded": player.has_folded,
                 "chips_in_stack": player.chips_in_stack,
@@ -74,8 +75,8 @@ def state_to_json(state: GameState) -> dict:
         "community_cards": [[card.rank.value, card.suit.value] for card in state.community_cards],
         "small_blind": state.small_blind,
         "big_blind": state.big_blind,
-        "min_raise": state.min_raise,
         "ante": state.ante,
+        "minimum_raise": state.minimum_raise,
     }
 
 
@@ -91,12 +92,12 @@ def state_from_json(data: dict) -> GameState:
         blind = BLINDS[entry["blind"]] if entry["blind"] is not None else None
 
         if entry["me"]:
-            my_player = MyPlayer(blind=blind, chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"], hole_cards={card(pair) for pair in data["hole_cards"]})
+            my_player = MyPlayer(id=entry["id"], blind=blind, chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"], hole_cards={card(pair) for pair in data["hole_cards"]})
             players.append(my_player)
         else:
-            players.append(Player(blind=blind, has_folded=entry["has_folded"], chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"]))
+            players.append(Player(id=entry["id"], blind=blind, has_folded=entry["has_folded"], chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"]))
 
-    return GameState(my_player=my_player, players=players, chips_in_pot=data["chips_in_pot"], community_cards={card(pair) for pair in data["community_cards"]}, small_blind=data["small_blind"], big_blind=data["big_blind"], min_raise=data["min_raise"], ante=data["ante"])
+    return GameState(my_player=my_player, players=players, chips_in_pot=data["chips_in_pot"], community_cards={card(pair) for pair in data["community_cards"]}, small_blind=data["small_blind"], big_blind=data["big_blind"], ante=data["ante"], minimum_raise=data["minimum_raise"])
 
 
 def action_to_json(action: Action) -> dict:
@@ -292,10 +293,10 @@ class Sandbox:
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
             "--read-only", "--tmpfs", "/tmp:size=64m,mode=1777",
             "--env", "HOME=/tmp", "--env", "PYTHONPATH=/official", "--env", "PYTHONDONTWRITEBYTECODE=1", "--env", "PYTHONHASHSEED=0",
-            "--volume", f"{Path(folder).resolve()}:/submission:ro",
+            "--volume", f"{Path(folder).resolve()}:/submission:ro", "--workdir", "/submission",  # Run from the repo, as CI is
             "--volume", f"{ENGINE}:/official/poker:ro",
             "--entrypoint", "python", self.image,
-            "-m", "poker.internals.sandbox", "/submission/myAI.py", str(self.timeout), seed,
+            "-P", "-m", "poker.internals.sandbox", "/submission/myAI.py", str(self.timeout), seed,  # -P keeps the repo's own copy of poker out
         ]
 
     def stop(self):

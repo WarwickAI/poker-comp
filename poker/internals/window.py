@@ -12,6 +12,7 @@ import sys
 #   "need"     it has shown everything it was sent, and is ready for the next hand
 #   "restart"  R was pressed
 #   "closed"   the window has closed, because ESC was pressed, it was closed, or it closed itself after its table was broken up
+#   ("controls", speed, paused)  the speed or pausing was changed in it, which every other window then follows
 # The generation goes up every time the tournament restarts, so that messages sent before a restart can be told apart.
 #
 # The main process can also be told
@@ -21,6 +22,7 @@ import sys
 #   ("hand", hand)                              a hand to show
 #   ("finish", title, lines, hints, close_after) there are no more hands to come, so show this once the last one is over
 #   ("reset", generation, players)              the tournament has started again
+#   ("controls", speed, paused)                 play at this speed, and pause or carry on, as the other windows do
 #   ("quit",)                                   close the window
 
 
@@ -55,6 +57,9 @@ def run_window(number: int, count: int, players: list[str], total_hands: int, fu
                         renderer.reset(players=command[2])
                         asked = False
 
+                    elif command[0] == "controls":
+                        renderer.speed, renderer.paused = command[1:]
+
                     elif command[0] == "quit":
                         return
 
@@ -68,7 +73,11 @@ def run_window(number: int, count: int, players: list[str], total_hands: int, fu
                 events.put((generation, number, "need"))
                 asked = True
 
+            controls = (renderer.speed, renderer.paused)
             renderer.update()
+
+            if (renderer.speed, renderer.paused) != controls:
+                events.put((generation, number, ("controls", renderer.speed, renderer.paused)))
 
             if renderer.should_close():
                 return
@@ -94,6 +103,7 @@ class Windows:
         self.reset_sent: set[int] = set()  # The windows told to start again at the latest restart
         self.count = 0
         self.generation = 0
+        self.controls: tuple[int, bool] | None = None  # The speed and pausing every window shares, once one has changed them
 
     def start(self, tables: dict[int, list[str]]):
         # Opens a window for every table, or starts again in the windows which are still open
@@ -125,6 +135,17 @@ class Windows:
         self.processes[number] = process
         self.open.add(number)
 
+        if self.controls is not None:
+            self.send(number, "controls", *self.controls)  # A window opened again plays at the speed the others do
+
+    def share_controls(self, number: int, speed: int, paused: bool):
+        # The speed or pausing was changed in one window, so every other window follows it
+        self.controls = (speed, paused)
+
+        for other in self.open:
+            if other != number:
+                self.send(other, "controls", speed, paused)
+
     @staticmethod
     def forget_queue(commands: multiprocessing.Queue):
         # Anything still waiting in the queue of a window which has gone is thrown away, rather than holding up the exit
@@ -135,7 +156,7 @@ class Windows:
         if number in self.open:
             self.commands[number].put(command)
 
-    def next_event(self) -> tuple[int, str] | None:
+    def next_event(self) -> tuple[int, str | tuple] | None:
         # Waits for a window to say something. Anything sent before the latest restart is dropped, apart from a window closing.
         while True:
             try:
@@ -160,6 +181,9 @@ class Windows:
 
             # It closed itself before it heard about the restart, so the table it should now be showing has no window
             return (number, "lost") if number in self.reset_sent else None
+
+        if isinstance(message, tuple) and message[0] == "controls" and number in self.open:
+            return number, message  # Shared whenever it was sent, as it doesn't depend on the hands
 
         if generation != self.generation or number not in self.open:
             return None

@@ -3,6 +3,8 @@ from __future__ import annotations
 import random
 import signal
 import threading
+import time
+from collections import Counter
 from contextlib import contextmanager
 from typing import Callable
 
@@ -60,8 +62,16 @@ class Seat:
         self.folded = False
         self.bet = 0  # Chips put in during the current betting round
         self.total_bet = 0  # Chips put in during the current hand
+        self.id: int | None = None  # What the AIs see this player as, which the tournament draws
         self.errors = 0
         self.peak = stack  # The most chips this player has had at the end of any hand, which is their score
+
+        # How they played, which poker test reports
+        self.actions: Counter[str] = Counter()  # How often each kind of action was played for them, and how often it put them all in
+        self.problems: Counter[str] = Counter()  # Why their bad actions happened
+        self.asked = 0  # How many actions their AI was asked for
+        self.thinking = 0.0  # Seconds their AI spent choosing them
+        self.slowest = 0.0
 
 
 class Match:
@@ -94,7 +104,8 @@ class Match:
         self.frames: list[dict] = []
         self.pot = 0
         self.current_bet = 0
-        self.min_raise = self.big_blind
+        self.raise_size = 0  # The smallest a bet or raise can be in the current betting round, unless it puts the player all in
+        self.acted: set[Seat] = set()  # Who has acted in the current betting round
 
     def play(self):
         # Plays until one player has every chip, or until the most hands the rules allow if they set a limit
@@ -209,7 +220,6 @@ class Match:
         self.frames = []
         self.pot = 0
         self.current_bet = 0
-        self.min_raise = self.big_blind
 
         small, big = (dealt[1], dealt[0]) if len(dealt) == 2 else (dealt[0], dealt[1])  # Heads-up, the button is the small blind
         small.blind = Blind.SMALL
@@ -246,6 +256,7 @@ class Match:
                 self.frame("blind", f"{seat.name} posts the {label} of {paid}", seat=seat, label=f"Blind {paid}")
 
         self.current_bet = max(small.bet, big.bet)  # Less than the big blind if the blinds are too short of chips to post it
+        self.raise_size = self.big_blind  # The big blind counts as the first bet, so the smallest raise is by a big blind
 
         self.betting_round(self.dealt_from(self.seats.index(big) + 1))
 
@@ -257,7 +268,7 @@ class Match:
                 seat.bet = 0
 
             self.current_bet = 0
-            self.min_raise = self.big_blind
+            self.raise_size = self.big_blind  # The smallest raise starts again at every betting round
 
             cards = [deck.pop() for _ in range(count)]
             self.board += cards
@@ -304,7 +315,7 @@ class Match:
         return amount
 
     def betting_round(self, order: list[Seat]):
-        acted: set[Seat] = set()
+        self.acted = set()
         index = 0
         skipped = 0
 
@@ -312,16 +323,17 @@ class Match:
             seat = order[index % len(order)]
             index += 1
 
-            if self.must_act(seat, acted):
+            if self.must_act(seat):
                 self.act(seat)
-                acted.add(seat)
+                self.acted.add(seat)
                 skipped = 0
             else:
                 skipped += 1
 
         self.return_uncalled()
 
-    def must_act(self, seat: Seat, acted: set[Seat]) -> bool:
+
+    def must_act(self, seat: Seat) -> bool:
         live = self.live()
 
         if seat.folded or seat.stack == 0 or len(live) < 2:
@@ -330,7 +342,7 @@ class Match:
         if seat.bet < self.current_bet:
             return True
 
-        if seat in acted:
+        if seat in self.acted:
             return False
 
         return sum(other.stack > 0 for other in live) > 1  # Otherwise there is nobody left to bet against
@@ -347,14 +359,11 @@ class Match:
         else:
             # The same as defaultAI in myAI.py
             seat.errors += 1
+            seat.problems[problem] += 1
             kind = Action.Kind.CHECK if to_call == 0 else Action.Kind.FOLD
 
-        if kind is Action.Kind.RAISE:
-            most = seat.stack - to_call
-            can_be_called = any(other.stack > 0 for other in self.live() if other is not seat)
-
-            if most <= 0 or not can_be_called:
-                kind = Action.Kind.CALL
+        if kind is Action.Kind.RAISE and seat.stack <= to_call:
+            kind = Action.Kind.CALL  # Calling already takes everything they have, so a raise is a call, which puts them all in
 
         if kind is Action.Kind.CALL and to_call == 0:
             kind = Action.Kind.CHECK
@@ -371,27 +380,39 @@ class Match:
             text, label = f"calls {paid}", f"Call {paid}"
 
         else:
-            # A raise is by `amount` on top of the bet being called.
-            amount = min(action.amount, most)
-            if most < self.min_raise:
-                amount = most
-            else:
-                amount = max(amount, self.min_raise)
-
+            # A raise is by `amount` on top of the bet being called. One smaller than the smallest raise is made the smallest raise,
+            # and one of more than the player has puts them all in.
+            amount = min(max(action.amount, self.raise_size), seat.stack - to_call)
             opening = self.current_bet == 0
             self.put_in(seat, to_call + amount)
+
+            if amount >= self.raise_size:
+                self.raise_size = amount  # A full raise, which the next one has to be at least as big as. An all-in for less doesn't change it.
+
             self.current_bet = seat.bet
-            self.min_raise = max(self.min_raise, amount)
             text, label = (f"bets {seat.bet}", f"Bet {seat.bet}") if opening else (f"raises to {seat.bet}", f"Raise {seat.bet}")
+
+        seat.actions[kind.value] += 1
 
         if seat.stack == 0 and kind in (Action.Kind.CALL, Action.Kind.RAISE):
             text += " and is all in"
+            seat.actions["all in"] += 1
 
         self.frame(kind.value, f"{seat.name} {text}", seat=seat, label=label, problem=problem)
 
     def ask(self, seat: Seat) -> tuple[Action | None, str | None]:
         state = self.state_for(seat)
+        started = time.perf_counter()
 
+        try:
+            return self.answer(seat, state)
+        finally:
+            took = time.perf_counter() - started
+            seat.asked += 1
+            seat.thinking += took
+            seat.slowest = max(seat.slowest, took)
+
+    def answer(self, seat: Seat, state: GameState) -> tuple[Action | None, str | None]:
         try:
             with time_limit(self.timeout):
                 action = seat.ai(state)
@@ -412,10 +433,10 @@ class Match:
 
     def state_for(self, seat: Seat) -> GameState:
         # Everything is built fresh, so that an AI can't change the game by changing what it is given
-        my_player = MyPlayer(blind=seat.blind, chips_in_stack=seat.stack, chips_bet=seat.bet, hole_cards=set(seat.hole_cards))
-        players = [my_player if other is seat else Player(blind=other.blind, has_folded=other.folded, chips_in_stack=other.stack, chips_bet=other.bet) for other in self.seats if other.dealt]
+        my_player = MyPlayer(id=seat.id, blind=seat.blind, chips_in_stack=seat.stack, chips_bet=seat.bet, hole_cards=set(seat.hole_cards))
+        players = [my_player if other is seat else Player(id=other.id, blind=other.blind, has_folded=other.folded, chips_in_stack=other.stack, chips_bet=other.bet) for other in self.seats if other.dealt]
 
-        return GameState(my_player=my_player, players=players, chips_in_pot=self.pot, community_cards=set(self.board), small_blind=self.small_blind, big_blind=self.big_blind, min_raise=self.min_raise, ante=self.ante)
+        return GameState(my_player=my_player, players=players, chips_in_pot=self.pot, community_cards=set(self.board), small_blind=self.small_blind, big_blind=self.big_blind, ante=self.ante, minimum_raise=self.raise_size)
 
     def return_uncalled(self):
         # If nobody matched the biggest bet, the unmatched part goes back

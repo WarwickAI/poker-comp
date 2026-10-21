@@ -29,8 +29,9 @@ def sample_state(rng: random.Random) -> GameState:
     blinds = [Blind.SMALL, Blind.BIG] + [None] * rng.randint(0, 4)
     rng.shuffle(blinds)
 
-    my_player = MyPlayer(blind=blinds[0], chips_in_stack=rng.randint(1, 1000), chips_bet=rng.choice([0, rng.randint(1, 100)]), hole_cards=hole_cards)
-    others = [Player(blind=blind, has_folded=rng.random() < 0.25, chips_in_stack=rng.randint(0, 1000), chips_bet=rng.choice([0, rng.randint(1, 100)])) for blind in blinds[1:]]
+    ids = rng.sample(range(1, 1_000_000), len(blinds))
+    my_player = MyPlayer(id=ids[0], blind=blinds[0], chips_in_stack=rng.randint(1, 1000), chips_bet=rng.choice([0, rng.randint(1, 100)]), hole_cards=hole_cards)
+    others = [Player(id=id, blind=blind, has_folded=rng.random() < 0.25, chips_in_stack=rng.randint(0, 1000), chips_bet=rng.choice([0, rng.randint(1, 100)])) for id, blind in zip(ids[1:], blinds[1:])]
 
     players = [my_player] + others
     rng.shuffle(players)
@@ -38,7 +39,9 @@ def sample_state(rng: random.Random) -> GameState:
     chips_in_pot = sum(player.chips_bet for player in players) + rng.choice([0, rng.randint(1, 500)])
     big_blind = rng.choice([2, 3, 4, 6, 8, 10, 15, 20])
 
-    return GameState(my_player=my_player, players=players, chips_in_pot=chips_in_pot, community_cards=community_cards, small_blind=big_blind // 2, big_blind=big_blind, ante=rng.choice([0, big_blind]))
+    minimum_raise = rng.choice([big_blind, rng.randint(big_blind, 10 * big_blind)])  # The smallest raise, which is never less than the big blind
+
+    return GameState(my_player=my_player, players=players, chips_in_pot=chips_in_pot, community_cards=community_cards, small_blind=big_blind // 2, big_blind=big_blind, ante=rng.choice([0, big_blind]), minimum_raise=minimum_raise)
 
 
 def check_states(ai: AI) -> list[str]:

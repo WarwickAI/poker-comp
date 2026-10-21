@@ -15,8 +15,8 @@ Hello all and welcome to the second Warwick AI programming competition!
 Don't worry if you're new to programming or AI, there's something here for everyone! For beginners, check out the WAI + Code Soc + UWCS Python course or ask us anything at our weekly code nights. See our [website](https://warwick.ai) for details.
 
 > [!IMPORTANT]
-> ### Please only change `myAI.py`
-> Your whole bot should be in `myAI.py`, and please don't edit, add, rename, move or delete any other file in your repository. That includes the `poker` folder, the `examples` folder, `pyproject.toml`, `README.md` and the `.github` folder. Every bot is played with the same copy of these files, so changing them can stop yours from working.
+> ### Only change `myAI.py` and files you add
+> Your bot is the `myAI` function in `myAI.py`, and you can add files of your own for it to use, such as helper modules or saved data. Please don't edit, rename, move or delete any of the other files you were given. That includes the `poker` folder, the `examples` folder, `pyproject.toml`, `README.md` and the `.github` folder. Every bot is played with the same copy of these files, so changing them can stop yours from working.
 >
 > If you have an idea for the game itself, we'd love to hear it (see [Contributing](#-contributing)).
 
@@ -99,13 +99,23 @@ The bots in the `examples` folder each follow one simple rule. A rule never chan
 | `call_preflop.py` | Calls before the flop, then checks or folds |
 | `call_when_big_blind.py` | Calls any bet when it is the big blind, and otherwise checks or folds |
 | `call_when_blind.py` | Calls any bet when it is the small blind or the big blind, and otherwise checks or folds |
-| `raise_by_big_blind_unless_raised.py` | Raises by at least the minimum raise whenever nobody has bet more than the big blind, and folds to anything bigger |
-| `raise_by_half_of_stack.py` | Raises by half of the chips it has left after calling, or the minimum raise if that is bigger |
-| `raise_by_pot.py` | Raises by the size of the pot, or the minimum raise if that is bigger |
-| `raise_by_pot_when_biggest_stack.py` | Raises by the size of the pot, or the minimum raise if that is bigger, when it has the most chips at the table, and otherwise checks or folds |
+| `raise_by_minimum.py` | Raises by the smallest amount allowed every time |
+| `raise_by_big_blind_unless_raised.py` | Raises by the big blind whenever nobody has bet more than the big blind, and folds to anything bigger |
+| `raise_by_half_of_stack.py` | Raises by half of the chips it has left after calling, or by the smallest raise if that's more, every time |
+| `raise_by_pot.py` | Raises by the size of the pot every time |
+| `raise_by_pot_when_biggest_stack.py` | Raises by the size of the pot when it has the most chips at the table, and otherwise checks or folds |
 | `go_all_in.py` | Goes all in every time |
 | `go_all_in_on_pair.py` | Goes all in when its two cards are a pair, and otherwise checks or folds |
 | `go_all_in_on_ace.py` | Goes all in when it holds an ace, and otherwise checks or folds |
+| `phil_hellmuth.py` | Goes all in with a hand in the top three of Phil Hellmuth's six tiers of starting hands, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `sklansky_and_malmuth.py` | Goes all in with a hand in the top three of David Sklansky and Mason Malmuth's eight groups of starting hands, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `real_play_statistics.py` | Goes all in with a hand in the top three of the nine tiers of starting hands from statistics based on real play, which rank each hand by how much it won on average in real games, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `bill_chen.py` | Goes all in with a score of at least 9 from Bill Chen's formula for scoring two cards, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `go_all_in_against_frequent_raisers.py` | Goes all in against a raise from a player it has often seen raising without going all in, and otherwise checks or folds |
+
+With fewer than 10 big blinds, waiting lets the blinds eat a stack, so these four go all in with any hand. The tiers, groups and formula are from [Wikipedia's page on starting hands](https://en.wikipedia.org/wiki/Texas_hold_%27em_starting_hands), and are written out in each bot.
+
+`go_all_in_against_frequent_raisers.py` keeps notes on the other players by their `id`. It only sees the table on its own turns, so it counts how often it has seen each player raising, which is having the biggest bet when it's more than the big blind, without going all in. "Often" means at least a fifth of the time, once it has seen that player 10 times. A player who often raises small usually has a weak hand, so going all in makes them fold.
 
 #### 👀 Watch a match
 ```bash
@@ -116,26 +126,32 @@ This opens a window and plays a match in it, showing everyone's cards, the bets 
 
 | Key | What it does |
 |---|---|
-| `SPACE` | Pause and resume |
-| `LEFT` / `RIGHT` | Step backwards and forwards |
-| `UP` / `DOWN` | Speed up and slow down |
+| `SPACE` | Pause and resume every table |
+| `LEFT` / `RIGHT` | Step backwards and forwards at this table, pausing every table |
+| `UP` / `DOWN` | Speed up and slow down every table |
 | `N` | Skip to the next hand |
 | `F` | Switch between a window and fullscreen |
-| `R` | Restart the match |
+| `R` | Restart the match, with the same seats |
 | `ESC` | Quit |
 
 #### ⚡ Run headless tests
 ```bash
-poker test 100 myAI.py examples/call.py examples/raise_by_big_blind_unless_raised.py examples/default.py
+poker test 100 myAI.py examples/call.py examples/raise_by_minimum.py examples/default.py
 ```
 
-This plays 100 matches without showing them, and prints how each AI did.
+This plays 100 matches without showing them. The seats are drawn once, and every match is played with them. It then prints:
+
+- How each AI did: how often it won, and its average place, score, peak chips and number of hands lasted.
+- How each AI played: how often it folded, checked, called, raised and went all in, and how long it took to choose.
+- Why any bad actions happened, with the most common reasons first.
 
 #### 🎲 Deterministic testing
 ```bash
-poker run myAI.py examples/raise_by_big_blind_unless_raised.py --seed 123
-poker test 100 myAI.py examples/raise_by_big_blind_unless_raised.py --seed 69
+poker run myAI.py examples/raise_by_minimum.py --seed 123
+poker test 100 myAI.py examples/raise_by_minimum.py --seed 69
 ```
+
+`--seed` makes the seats and the cards the same every time, so the same command plays the same matches again.
 
 #### 🆚 Comparing versions of your AI
 ```bash
@@ -173,7 +189,8 @@ These are the rules every game is played by, including the weekly competition. A
 
 ### Tables
 
-- A table seats at most 8 players. With more than 8, players are dealt out in turn, in the order they are given, between as few tables as they fit at, so the tables are as even as they can be. In the weekly tournament, the order is drawn at random.
+- The seats are drawn at random before the first hand, so nobody always sits next to the same players.
+- A table seats at most 8 players. With more than 8, players are dealt out in turn, in the order their seats were drawn, between as few tables as they fit at, so the tables are as even as they can be.
 - The tables play **hand for hand**: no table deals its next hand until every other table has finished the one before. So hand 20 at one table is played alongside hand 20 at every other.
 - Players are only moved between tables once every table has finished a hand.
   - **Breaking a table:** when everyone left would fit at fewer tables, the table with the fewest players is broken up, and its players are sent one at a time to whichever tables have the fewest players.
@@ -184,7 +201,11 @@ These are the rules every game is played by, including the weekly competition. A
 
 - The dealer button starts at a random seat and moves on to the next player every hand. The two players after the button pay the small and big blinds. When only two players are left, the button pays the small blind.
 - From the fourth level, everyone also pays an **ante** into the pot before the hand. An ante doesn't count towards calling a bet.
-- **Betting and raising:** `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more chips. The minimum bet and raise are one big blind. The small blind is the only exception to the minimum bet when posting the blind. If a bet or raise is bigger than the current minimum raise, that amount becomes the new minimum raise for the rest of the betting round. The minimum raise resets to one big blind at the start of each betting round: pre-flop, flop, turn and river. A raise below the minimum is rounded up to the minimum when the player can afford it; otherwise, the player goes all in for their remaining chips. A short all-in below the minimum does not change the minimum raise. A raise of more than you have puts you all in. If nobody left could call a raise, a raise counts as a call.
+- **Raising:** `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more chips. A raise of more than you have puts you all in.
+- **The smallest raise:** the first bet in a betting round must be at least the big blind, and before the flop the big blind counts as that first bet. Every raise must be at least as big as the biggest bet or raise so far in the betting round. This starts again on the flop, the turn and the river. A smaller raise is made the smallest one allowed, and going all in is always allowed, even for less.
+  - With blinds of 1/2, if someone raises to 7, which is by 5, the next raise must be by at least 5, to 12 or more.
+  - After the flop, if someone bets 7, the next raise must be by at least 7, to 14 or more.
+- **You can always raise when it's your turn.** If calling already takes everything you have, a raise counts as a call, which puts you all in. Any part of a raise which nobody calls goes back to you.
 - **Calling** a bet bigger than your stack puts you all in.
 - Any part of a bet which nobody called goes back to the player who made it. Side pots are made for players who are all in, and a split pot gives any odd chips to the first players after the button.
 
@@ -234,14 +255,14 @@ Most of the score is for building a stack. A bot which folds every hand can outl
 - **100 points** when you push a bot which passes the tests, which check it returns an action, in time, on 1000 sample states.
 - Every weekly tournament then adds your **tournament score** to your total on the leaderboard.
 - Your points add up from week to week, even when you push a new bot.
-- Each week, your latest bot which passes the tests plays. If your newest push fails the tests, your last one which passed plays instead.
+- Each week, the bot from your latest push plays, as long as it passes the tests. If it doesn't pass them, you don't play that week, so check with `poker score` before you push.
 
 ---
 
 ## 🧠 Writing Your AI
 
 ### The Basics
-Your submission is the `myAI` function in `myAI.py`, and **`myAI.py` should be the only file you change**. Please put everything your bot needs, including any helper functions, in `myAI.py`:
+Your submission is the `myAI` function in `myAI.py`. **Of the files you were given, `myAI.py` should be the only one you change**, but you can add files of your own for it to use:
 
 ```python
 def myAI(state: GameState) -> Action:
@@ -252,12 +273,21 @@ def myAI(state: GameState) -> Action:
 Your AI function should use the current state of the game `state` and output an `Action` of type of `CHECK`, `CALL`, `RAISE` or `FOLD`·
 These can be constructed using `Action.check()`, `Action.call()`, `Action.raise_by(amount: int)` or `Action.fold()`.
 
+### Using Your Own Files
+
+- **Helper modules** next to `myAI.py` can be imported as usual, such as `from helpers import hand_strength` for a `helpers.py`.
+- **Data files**, such as saved weights, are best opened with a path from `myAI.py`'s folder, such as `Path(__file__).parent / "weights.json"`, so they're found wherever the game is run from.
+- **Packages:** only Python's standard library and the packages this project installs are there when your bot is tested and played, so it can't use other packages. Adding them to `pyproject.toml` won't help, because every bot is played with the same copy of it.
+- In the weekly tournament, your bot can read its files but not change them.
+
 ### What Your AI Sees
 
 The game is played by the [Tournament Rules](#-tournament-rules) above. A few things about the `state` your AI is given:
 
 - `chips_bet` is how many chips a player has put in during the current betting round, so the amount you need to call is the biggest `chips_bet` at the table minus your own. `chips_in_pot` is everything bet in the hand so far.
-- `small_blind`, `big_blind` and `ante` are the sizes for the current hand, so your AI can size its bets as the blinds go up. `min_raise` is the minimum additional amount a bet or raise must be; it resets to `big_blind` each betting round and can increase during that round.
+- `small_blind`, `big_blind` and `ante` are the sizes for the current hand, so your AI can size its bets as the blinds go up.
+- `minimum_raise` is the smallest amount you can raise by. A smaller raise is made this one. If you have fewer chips than this after calling, raising puts you all in.
+- Every player has an `id`, a random number which stays the same for one tournament, even if they move tables, so your AI can tell players apart. Each match of `poker run` or `poker test` is a new tournament, with new ids, and the weekly tournament is one tournament.
 
 ### Some Inspiration
 
@@ -274,9 +304,9 @@ There's all sorts of ways to write an AI for this competition:
 To submit your AI, simply push a commit to your repository. 
 
 > [!IMPORTANT]
-> **Your commits should only change `myAI.py`.** Before you push, check that no other file has changed, for example with `git status`. If anything other than `myAI.py` is listed, undo the change with `git restore <file>`, or delete the file if you added it.
+> **Your commits should only change `myAI.py` and files you've added.** Before you push, check with `git status` that none of the other files you were given has changed. If one has, undo the change with `git restore <file>`.
 
-Every week at code night, your latest bot which passes the tests will compete against all other submitted bots. Your points add up from week to week, and you can see them on our website! <https://warwick.ai>
+Every week at code night, the bot from your latest push will compete against all other submitted bots, as long as it passes the tests. Your points add up from week to week, and you can see them on our website! <https://warwick.ai>
 
 ---
 
@@ -286,7 +316,7 @@ This is for the organisers. Whenever this template changes, bring every team's r
 
 Each week:
 
-1. **Download every team's bot.** In the website folder, this picks each team's latest submission which passed the tests:
+1. **Download every team's bot.** In the website folder, this picks each team's latest submission. A team whose latest bot didn't pass the tests is left out of the tournament:
    ```bash
    PROJECT_ID=poker PICK=latest npx astro db execute db/download-snapshots.ts --remote
    ```
@@ -321,7 +351,7 @@ The leaderboard adds each team's tournament score to their total. Recording a ro
 ## Important!!!
 
 > [!IMPORTANT]
-> **Please only change `myAI.py`,** and put all of your code, including helper functions, in it.
+> **Please only change `myAI.py` and files you've added yourself.**
 
 Other than this, have fun and see you at code nights! 
 

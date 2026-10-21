@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass
 
 from .engine import AI, Match, Seat
@@ -33,6 +34,7 @@ class Result:
     hand: int | None = None
     peak: int = 0  # The most chips they had at the end of any hand
     score: int = 0
+    seat: Seat | None = None  # Their seat, which says how they played
 
 
 @dataclass
@@ -94,6 +96,14 @@ class Tournament:
             # With more than one table, every table shares the same blinds. They all go up together, between hands, as soon as
             # the rules say they should at any table. A single table goes up by itself, exactly as a Match does.
             table.match.shared_blinds = count > 1
+
+        # Every player gets a random id for the whole tournament, so that an AI can tell players apart, and learn how each one
+        # plays, without knowing who they are. It comes from a random number generator of its own, so the cards don't change.
+        seats = [seat for table in self.tables for seat in table.match.seats]
+        ids = random.Random(None if seed is None else f"{seed}/ids").sample(range(1, 1_000_000), len(seats))
+
+        for seat, number in zip(seats, ids):
+            seat.id = number
 
         self.entrants = len(ais)
         self.exits: list[Exit] = []
@@ -170,8 +180,8 @@ class Tournament:
         # Any exact tie goes to the lower numbered table, then the earlier seat, so the places never depend on which table happened
         # to play the hand first
         gone = sorted(self.exits, key=lambda exit: (exit.hand, exit.started_with, -exit.table, -exit.position), reverse=True)
-        results = [Result(place=0, name=seat.name, stack=seat.stack, errors=seat.errors, peak=seat.peak) for seat in still_in]
-        results += [Result(place=0, name=exit.seat.name, stack=0, errors=exit.seat.errors, table=exit.table, hand=exit.hand, peak=exit.seat.peak) for exit in gone]
+        results = [Result(place=0, name=seat.name, stack=seat.stack, errors=seat.errors, peak=seat.peak, seat=seat) for seat in still_in]
+        results += [Result(place=0, name=exit.seat.name, stack=0, errors=exit.seat.errors, table=exit.table, hand=exit.hand, peak=exit.seat.peak, seat=exit.seat) for exit in gone]
 
         for place, result in enumerate(results, start=1):
             result.place = place
