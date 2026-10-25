@@ -297,7 +297,7 @@ Each week:
    If `~/poker-round-1` already exists, e.g. from downloading again, move or delete it first. Otherwise `mv` puts the new bots inside it, as `~/poker-round-1/poker`, and the tournament still plays the old ones.
 3. **Check the bots and build the sandbox.** In the WarwickAI/competitions folder, with Docker running, this runs every team's tests again in a locked-down container of its own, and builds the `wai-results` image the tournament uses:
    ```bash
-   STUDENT_FILES="myAI.py" ./results/run.sh ~/poker-round-1 ../poker-comp-update
+   STUDENT_FILES="myAI.py" ./results/run.sh ~/poker-round-1 ../poker-comp
    ```
 4. **Play the tournament.** In this folder, with Docker running, first try a few hands, which should say that every bot is ready:
    ```bash
@@ -310,7 +310,7 @@ Each week:
    Every team's bot runs in a Docker container of its own, with no network and no access to your files, and only the game itself runs on your computer. What each bot prints is kept in `bot-logs`, up to 1 MB each. Never add `--no-sandbox` for the teams' bots, as it runs their code on your computer itself.
 5. **Record the results.** In the website folder, check with a dry run first, then run it again without `DRY_RUN=1`:
    ```bash
-   PROJECT_ID=poker ROUND=1 RESULTS=../poker-comp-update/round-1.json DRY_RUN=1 \
+   PROJECT_ID=poker ROUND=1 RESULTS=../poker-comp/round-1.json DRY_RUN=1 \
      npx astro db execute db/record-tournament.ts --remote
    ```
 
