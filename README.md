@@ -106,6 +106,12 @@ The bots in the `examples` folder each follow one simple rule. A rule never chan
 | `go_all_in.py` | Goes all in every time |
 | `go_all_in_on_pair.py` | Goes all in when its two cards are a pair, and otherwise checks or folds |
 | `go_all_in_on_ace.py` | Goes all in when it holds an ace, and otherwise checks or folds |
+| `phil_hellmuth.py` | Goes all in with a hand in the top three of Phil Hellmuth's six tiers of starting hands, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `sklansky_and_malmuth.py` | Goes all in with a hand in the top three of David Sklansky and Mason Malmuth's eight groups of starting hands, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `real_play_statistics.py` | Goes all in with a hand in the top three of the nine tiers of starting hands from statistics based on real play, which rank each hand by how much it won on average in real games, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+| `bill_chen.py` | Goes all in with a score of at least 9 from Bill Chen's formula for scoring two cards, or any hand with fewer than 10 big blinds, and otherwise checks or folds |
+
+With fewer than 10 big blinds, waiting lets the blinds eat a stack, so these four go all in with any hand. The tiers, groups and formula are from [Wikipedia's page on starting hands](https://en.wikipedia.org/wiki/Texas_hold_%27em_starting_hands), and are written out in each bot.
 
 #### 👀 Watch a match
 ```bash
