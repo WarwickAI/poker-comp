@@ -6,12 +6,8 @@ def myAI(state: GameState) -> Action:
     # Raises by the big blind whenever nobody has bet more than the big blind, and folds to anything bigger
     biggest_bet = max(player.chips_bet for player in state.players)
     to_call = biggest_bet - state.my_player.chips_bet
-    left_after_calling = state.my_player.chips_in_stack - to_call
 
     if biggest_bet > state.big_blind:
         return Action.check() if to_call == 0 else Action.fold()
 
-    if left_after_calling <= 0:
-        return Action.call()  # We can only just call, or not even that, so this puts us all in
-
-    return Action.raise_by(min(state.min_raise, left_after_calling))
+    return Action.raise_by(state.big_blind)  # Never less than the smallest raise here, as nobody has bet more than the big blind
