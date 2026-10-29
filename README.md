@@ -258,6 +258,7 @@ The game is played by the [Tournament Rules](#-tournament-rules) above. A few th
 
 - `chips_bet` is how many chips a player has put in during the current betting round, so the amount you need to call is the biggest `chips_bet` at the table minus your own. `chips_in_pot` is everything bet in the hand so far.
 - `small_blind`, `big_blind` and `ante` are the sizes for the current hand, so your AI can size its bets as the blinds go up. `min_raise` is the minimum additional amount a bet or raise must be; it resets to `big_blind` each betting round and can increase during that round.
+- Every player has an `id`, a random number which stays the same for one tournament, even if they move tables, so your AI can tell players apart. Each match of `poker run` or `poker test` is a new tournament, with new ids, and the weekly tournament is one tournament.
 
 ### Some Inspiration
 
