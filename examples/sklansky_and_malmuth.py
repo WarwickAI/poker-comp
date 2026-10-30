@@ -29,10 +29,17 @@ def hand(state: GameState) -> str:
 def myAI(state: GameState) -> Action:
     # Goes all in with a hand in the top three of Sklansky and Malmuth's eight groups, or any hand with fewer than 10 big blinds, and otherwise checks or folds
     # With fewer than 10 big blinds, waiting lets the blinds eat our chips, so any two cards are worth going all in with
-    big_blinds = (state.my_player.chips_in_stack + state.my_player.chips_bet) / state.big_blind
+    me = state.my_player
+    to_call = max(player.chips_bet for player in state.players) - me.chips_bet
+    left_after_calling = me.chips_in_stack - to_call
+    can_be_called = any(player is not me and not player.has_folded and player.chips_in_stack > 0 for player in state.players)
+    big_blinds = (me.chips_in_stack + me.chips_bet) / state.big_blind
 
-    if big_blinds < 10 or any(hand(state) in group for group in GROUPS[:3]):
-        return Action.raise_by(10 ** 9)  # More than anyone has, which puts us all in
+    if not (big_blinds < 10 or any(hand(state) in group for group in GROUPS[:3])):
+        return Action.check() if to_call == 0 else Action.fold()
 
-    to_call = max(player.chips_bet for player in state.players) - state.my_player.chips_bet
-    return Action.check() if to_call == 0 else Action.fold()
+    if left_after_calling <= 0 or not can_be_called:
+        # A raise would only be a call, as calling takes everything we have, or nobody left has chips to call more
+        return Action.check() if to_call == 0 else Action.call()
+
+    return Action.raise_by(left_after_calling)  # Everything we have left after calling, which puts us all in
