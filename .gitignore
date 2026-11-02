@@ -221,3 +221,6 @@ score.txt
 
 # What the bots print during a tournament
 bot-logs/
+
+# Macs
+.DS_Store
