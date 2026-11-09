@@ -20,6 +20,7 @@ from .tournament import TABLE_SIZE, Tournament
 
 
 STARTING_PATH = list(sys.path)  # The module search path from before any bot is loaded, for the windows to start with
+OPEN_FILES = 4096  # Enough files for every team's container to keep a few open, and every table's window
 
 
 def load_ais(specs: list[str], least: int = 2, taken: list[str] = ()) -> list[tuple[str, AI]]:
@@ -437,7 +438,24 @@ def score(args: argparse.Namespace):
     score_ai(ai, args.output)
 
 
+def allow_open_files():
+    # macOS lets a process have only 256 files open unless it asks for more, which about 60 teams' containers use up by themselves
+    try:
+        import resource
+    except ImportError:
+        return  # Windows has no such limit
+
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+    if soft != resource.RLIM_INFINITY and soft < OPEN_FILES:
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (OPEN_FILES if hard == resource.RLIM_INFINITY else min(OPEN_FILES, hard), hard))
+        except (ValueError, OSError):
+            pass  # The limit stays as it was, which is enough for fewer teams
+
+
 def main(argv: list[str] | None = None):
+    allow_open_files()
     options = argparse.ArgumentParser(add_help=False)
     options.add_argument("--rules", metavar="FILE", help="a yaml file of rules to play by, like poker/internals/rules.yaml. It only needs the rules which are different")
     options.add_argument("--hands", type=whole, help="most hands each table plays, or 0 to play until one AI has every chip, in place of what the rules say")
