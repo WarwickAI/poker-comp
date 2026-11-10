@@ -193,6 +193,7 @@ These are the rules every game is played by, including the weekly competition. A
 - **Betting and raising:** `Action.raise_by(amount)` calls the current bet and then raises it by `amount` more chips. The minimum bet and raise are one big blind. The small blind is the only exception to the minimum bet when posting the blind. If a bet or raise is bigger than the current minimum raise, that amount becomes the new minimum raise for the rest of the betting round. The minimum raise resets to one big blind at the start of each betting round: pre-flop, flop, turn and river. A raise below the minimum is rounded up to the minimum when the player can afford it; otherwise, the player goes all in for their remaining chips. A short all-in below the minimum does not change the minimum raise. A raise of more than you have puts you all in. If nobody left could call a raise, a raise counts as a call.
 - **Calling** a bet bigger than your stack puts you all in.
 - Any part of a bet which nobody called goes back to the player who made it. Side pots are made for players who are all in, and a split pot gives any odd chips to the first players after the button.
+- **Showdown:** if anyone is all in, every hand is shown. Otherwise the last player to bet or raise on the river shows first (or the first player after the button, if nobody did), then each player round the table shows only if their hand beats or ties the best shown so far, and the rest muck. A player who wins because everyone else folded doesn't show.
 
 ### Blinds and Antes
 
@@ -265,6 +266,8 @@ The game is played by the [Tournament Rules](#-tournament-rules) above. A few th
 - `chips_bet` is how many chips a player has put in during the current betting round, so the amount you need to call is the biggest `chips_bet` at the table minus your own. `chips_in_pot` is everything bet in the hand so far.
 - `small_blind`, `big_blind` and `ante` are the sizes for the current hand, so your AI can size its bets as the blinds go up. `min_raise` is the minimum additional amount a bet or raise must be; it resets to `big_blind` each betting round and can increase during that round.
 - Every player has an `id`, a random number which stays the same for one tournament, even if they move tables, so your AI can tell players apart. Each match of `poker run` or `poker test` is a new tournament, with new ids, and the weekly tournament is one tournament.
+- `history` is every action in this hand so far, in order, as `HandAction`s: the player's `id`, the `street` (0 preflop to 3 the river), the `kind`, their `chips_bet` on that street after it, and whether it put them `all_in`. Blinds and antes aren't included.
+- `previous_hands` is every hand at your table that finished since your last turn, as `HandRecord`s. It is usually just the last hand, but it can be more if you had no turn in one. Each record has the board in order, every action, each player's chips at the end and what they put in, the cards everyone `shown` at the showdown (see above for who mucks), and what each player `won`.
 
 ### Some Inspiration
 

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..action import Action
 from ..card import Card, Rank, Suit
-from ..game_state import GameState
+from ..game_state import GameState, HandAction, HandRecord
 from ..player import Blind, MyPlayer, Player
 
 
@@ -57,47 +57,81 @@ BLINDS = {blind.value: blind for blind in Blind}
 KINDS = {kind.value: kind for kind in Action.Kind}
 
 
+def player_to_json(player: Player) -> dict:
+    return {"id": player.id, "blind": player.blind.value if player.blind else None, "has_folded": player.has_folded, "chips_in_stack": player.chips_in_stack, "chips_bet": player.chips_bet}
+
+
+def player_from_json(entry: dict) -> Player:
+    return Player(id=entry["id"], blind=BLINDS[entry["blind"]] if entry["blind"] is not None else None, has_folded=entry["has_folded"], chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"])
+
+
+def cards_to_json(cards) -> list:
+    return [[card.rank.value, card.suit.value] for card in cards]
+
+
+def card_from_json(pair: list) -> Card:
+    rank, suit = pair
+    return Card(RANKS[rank], SUITS[suit])
+
+
+def actions_to_json(actions: list[HandAction]) -> list:
+    return [[action.id, action.street, action.kind.value, action.chips_bet, action.all_in] for action in actions]
+
+
+def actions_from_json(data: list) -> list[HandAction]:
+    return [HandAction(id=id, street=street, kind=KINDS[kind], chips_bet=bet, all_in=all_in) for id, street, kind, bet, all_in in data]
+
+
 def state_to_json(state: GameState) -> dict:
+    # Ids may be None, so the dicts of a HandRecord are sent as lists of pairs, as JSON keys can only be strings
     return {
-        "players": [
-            {
-                "me": player is state.my_player,
-                "id": player.id,
-                "blind": player.blind.value if player.blind else None,
-                "has_folded": player.has_folded,
-                "chips_in_stack": player.chips_in_stack,
-                "chips_bet": player.chips_bet,
-            }
-            for player in state.players
-        ],
-        "hole_cards": [[card.rank.value, card.suit.value] for card in state.my_player.hole_cards],
+        "players": [player_to_json(player) | {"me": player is state.my_player} for player in state.players],
+        "hole_cards": cards_to_json(state.my_player.hole_cards),
         "chips_in_pot": state.chips_in_pot,
-        "community_cards": [[card.rank.value, card.suit.value] for card in state.community_cards],
+        "community_cards": cards_to_json(state.community_cards),
         "small_blind": state.small_blind,
         "big_blind": state.big_blind,
         "min_raise": state.min_raise,
         "ante": state.ante,
+        "history": actions_to_json(state.history),
+        "previous_hands": [
+            {
+                "number": hand.number,
+                "small_blind": hand.small_blind,
+                "big_blind": hand.big_blind,
+                "ante": hand.ante,
+                "players": [player_to_json(player) for player in hand.players],
+                "board": cards_to_json(hand.board),
+                "actions": actions_to_json(hand.actions),
+                "shown": [[id, cards_to_json(cards)] for id, cards in hand.shown.items()],
+                "won": list(hand.won.items()),
+            }
+            for hand in state.previous_hands
+        ],
     }
 
 
 def state_from_json(data: dict) -> GameState:
-    def card(pair: list) -> Card:
-        rank, suit = pair
-        return Card(RANKS[rank], SUITS[suit])
-
     my_player = None
     players = []
 
     for entry in data["players"]:
-        blind = BLINDS[entry["blind"]] if entry["blind"] is not None else None
-
         if entry["me"]:
-            my_player = MyPlayer(id=entry["id"], blind=blind, chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"], hole_cards={card(pair) for pair in data["hole_cards"]})
+            blind = BLINDS[entry["blind"]] if entry["blind"] is not None else None
+            my_player = MyPlayer(id=entry["id"], blind=blind, chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"], hole_cards={card_from_json(pair) for pair in data["hole_cards"]})
             players.append(my_player)
         else:
-            players.append(Player(id=entry["id"], blind=blind, has_folded=entry["has_folded"], chips_in_stack=entry["chips_in_stack"], chips_bet=entry["chips_bet"]))
+            players.append(player_from_json(entry))
 
-    return GameState(my_player=my_player, players=players, chips_in_pot=data["chips_in_pot"], community_cards={card(pair) for pair in data["community_cards"]}, small_blind=data["small_blind"], big_blind=data["big_blind"], min_raise=data["min_raise"], ante=data["ante"])
+    previous_hands = [
+        HandRecord(number=hand["number"], small_blind=hand["small_blind"], big_blind=hand["big_blind"], ante=hand["ante"],
+                   players=[player_from_json(entry) for entry in hand["players"]], board=[card_from_json(pair) for pair in hand["board"]], actions=actions_from_json(hand["actions"]),
+                   shown={id: {card_from_json(pair) for pair in cards} for id, cards in hand["shown"]}, won={id: amount for id, amount in hand["won"]})
+        for hand in data["previous_hands"]
+    ]
+
+    return GameState(my_player=my_player, players=players, chips_in_pot=data["chips_in_pot"], community_cards={card_from_json(pair) for pair in data["community_cards"]}, small_blind=data["small_blind"], big_blind=data["big_blind"], min_raise=data["min_raise"], ante=data["ante"],
+                     history=actions_from_json(data["history"]), previous_hands=previous_hands)
 
 
 def action_to_json(action: Action) -> dict:
