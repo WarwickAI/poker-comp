@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import random
 import signal
 import threading
@@ -8,7 +9,7 @@ from typing import Callable
 
 from ..action import Action
 from ..card import Card, Rank, Suit
-from ..game_state import GameState
+from ..game_state import GameState, HandAction, HandRecord
 from .hand import describe, evaluate
 from ..player import Blind, MyPlayer, Player
 from .rules import Rules
@@ -63,6 +64,7 @@ class Seat:
         self.id: int | None = None  # What the AIs see this player as, which the tournament draws
         self.errors = 0
         self.peak = stack  # The most chips this player has had at the end of any hand, which is their score
+        self.unseen: list[HandRecord] = []  # The hands finished since this player's last turn, shared with the others at the table
 
 
 class Match:
@@ -86,6 +88,7 @@ class Match:
         self.ante = 0  # The ante for the current hand
         self.notes: list[str] = []  # Anything to mention at the start of the next hand, such as a player joining the table
         self.shared_blinds = False  # Whether something else, such as a tournament of several tables, decides when the blinds go up
+        self.number = 0  # This hand's number
 
         self.rng = random.Random(seed)
         self.button = self.rng.randrange(len(self.seats))
@@ -96,6 +99,10 @@ class Match:
         self.pot = 0
         self.current_bet = 0
         self.min_raise = self.big_blind
+        self.actions: list[HandAction] = []  # This hand's
+        self.aggressor: Seat | None = None  # The last to bet or raise in this betting round
+        self.won: dict[Seat, int] = {}
+        self.shown: list[Seat] = []  # Who showed their cards at the showdown, in the order they showed them
 
     def play(self):
         # Plays until one player has every chip, or until the most hands the rules allow if they set a limit
@@ -188,6 +195,7 @@ class Match:
         self.hands_since_cut += 1
         ante = self.ante = self.current_ante()
         total_chips = sum(seat.stack for seat in self.seats)
+        self.number = number
 
         for seat in self.seats:
             seat.dealt = seat.stack > 0
@@ -211,6 +219,9 @@ class Match:
         self.pot = 0
         self.current_bet = 0
         self.min_raise = self.big_blind
+        self.actions = []
+        self.aggressor = None
+        self.won = {}
 
         small, big = (dealt[1], dealt[0]) if len(dealt) == 2 else (dealt[0], dealt[1])  # Heads-up, the button is the small blind
         small.blind = Blind.SMALL
@@ -259,6 +270,7 @@ class Match:
 
             self.current_bet = 0
             self.min_raise = self.big_blind
+            self.aggressor = None
 
             cards = [deck.pop() for _ in range(count)]
             self.board += cards
@@ -269,6 +281,11 @@ class Match:
         self.settle(dealt, hand)
 
         hand["board"] = [card_code(card) for card in self.board]
+        record = self.record()
+
+        for seat in self.seats:
+            if seat.stack > 0:  # Whoever went out will never be asked again
+                seat.unseen.append(record)
 
         self.hands.append(hand)
 
@@ -383,15 +400,20 @@ class Match:
             self.put_in(seat, to_call + amount)
             self.current_bet = seat.bet
             self.min_raise = max(self.min_raise, amount)
+            self.aggressor = seat
             text, label = (f"bets {seat.bet}", f"Bet {seat.bet}") if opening else (f"raises to {seat.bet}", f"Raise {seat.bet}")
 
-        if seat.stack == 0 and kind in (Action.Kind.CALL, Action.Kind.RAISE):
+        all_in = seat.stack == 0 and kind in (Action.Kind.CALL, Action.Kind.RAISE)
+        self.actions.append(HandAction(id=seat.id, street=max(len(self.board) - 2, 0), kind=kind, chips_bet=seat.bet, all_in=all_in))
+
+        if all_in:
             text += " and is all in"
 
         self.frame(kind.value, f"{seat.name} {text}", seat=seat, label=label, problem=problem)
 
     def ask(self, seat: Seat) -> tuple[Action | None, str | None]:
         state = self.state_for(seat)
+        seat.unseen = []
 
         try:
             with time_limit(self.timeout):
@@ -416,7 +438,35 @@ class Match:
         my_player = MyPlayer(id=seat.id, blind=seat.blind, chips_in_stack=seat.stack, chips_bet=seat.bet, hole_cards=set(seat.hole_cards))
         players = [my_player if other is seat else Player(id=other.id, blind=other.blind, has_folded=other.folded, chips_in_stack=other.stack, chips_bet=other.bet) for other in self.seats if other.dealt]
 
-        return GameState(my_player=my_player, players=players, chips_in_pot=self.pot, community_cards=set(self.board), small_blind=self.small_blind, big_blind=self.big_blind, min_raise=self.min_raise, ante=self.ante)
+        history = copy.deepcopy(self.actions)
+        previous_hands = copy.deepcopy(seat.unseen)
+
+        return GameState(
+            my_player=my_player,
+            players=players,
+            chips_in_pot=self.pot,
+            community_cards=set(self.board),
+            small_blind=self.small_blind,
+            big_blind=self.big_blind,
+            min_raise=self.min_raise,
+            ante=self.ante,
+            history=history,
+            previous_hands=previous_hands,
+        )
+
+    def record(self) -> HandRecord:
+        # The hand just finished. Every player at the table is given a copy, in state_for.
+        return HandRecord(
+            number=self.number,
+            small_blind=self.small_blind,
+            big_blind=self.big_blind,
+            ante=self.ante,
+            players=[Player(id=seat.id, blind=seat.blind, has_folded=seat.folded, chips_in_stack=seat.stack, chips_bet=seat.total_bet) for seat in self.seats if seat.dealt],
+            board=list(self.board),
+            actions=list(self.actions),
+            shown={seat.id: set(seat.hole_cards) for seat in self.shown},
+            won={seat.id: amount for seat, amount in self.won.items() if amount},
+        )
 
     def return_uncalled(self):
         # If nobody matched the biggest bet, the unmatched part goes back
@@ -433,6 +483,7 @@ class Match:
 
     def settle(self, dealt: list[Seat], hand: dict):
         live = self.live()
+        self.shown = []
 
         for seat in dealt:
             seat.bet = 0
@@ -447,6 +498,20 @@ class Match:
             hand["ranks"][self.seats.index(seat)] = describe(scores[seat])
 
         self.frame("showdown", "Showdown")
+        order = [seat for seat in dealt if seat in live]
+
+        if any(seat.stack == 0 for seat in live):
+            self.shown = order  # Once anyone is all in, every hand is shown
+        else:
+            # The river's last bettor or raiser shows first, then round the table whoever can beat or tie the best hand shown so far
+            start = order.index(self.aggressor) if self.aggressor in order else 0
+            best = None
+
+            for seat in order[start:] + order[:start]:
+                if best is None or scores[seat] >= best:
+                    self.shown.append(seat)
+                    best = scores[seat]
+
         pots = self.pots(dealt)
 
         for number, (amount, eligible) in enumerate(pots):
@@ -463,6 +528,7 @@ class Match:
 
         for index, seat in enumerate(winners):
             seat.stack += share + (index < extra)
+            self.won[seat] = self.won.get(seat, 0) + share + (index < extra)
 
         self.pot -= amount
         self.frame("win", text, winners=winners)
