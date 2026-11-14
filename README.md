@@ -88,7 +88,7 @@ Please note, command line tools will not work from a github codespace, instead t
 
 ## 🎯 Running the Game
 
-Installing the project gives you a `poker` command, which plays AIs against each other. An AI is any python file with a `myAI` function, and there are a few simple ones to play against in the `examples` folder. At least 2 AIs can play. More than 8 are split between tables, and `poker run` opens a window for each table. The game is played by the [Tournament Rules](#-tournament-rules) below. When it ends, poker prints where everyone finished, the hand (and table) on which each player went out, and everyone's score.
+Installing the project gives you a `poker` command, which plays AIs against each other. An AI is any python file with a `myAI` function, and there are a few simple ones to play against in the `examples` folder. At least 2 AIs can play. More than 8 are split between tables, and `poker run` shows them all side by side in one window. The game is played by the [Tournament Rules](#-tournament-rules) below. When it ends, poker prints where everyone finished, the hand (and table) on which each player went out, and everyone's score.
 
 The bots in the `examples` folder each follow one simple rule. A rule never changes as the flop, turn and river are dealt:
 
@@ -118,7 +118,7 @@ With fewer than 10 big blinds, waiting lets the blinds eat a stack, so these fou
 poker run myAI.py examples/call.py examples/default.py
 ```
 
-This opens a window and plays a match in it, showing everyone's cards, the bets and what each AI does. The window can be resized, and adding `--fullscreen` starts it filling the screen.
+This opens a window and plays a match in it, showing everyone's cards, the bets and what each AI does. The window can be resized, and adding `--fullscreen` starts it filling the screen. With more than one table, the tables are tiled in a grid in the window, each as big as will fit, and the grid is laid out again to fill the window whenever a table closes or the window changes size.
 
 | Key | What it does |
 |---|---|
@@ -129,6 +129,8 @@ This opens a window and plays a match in it, showing everyone's cards, the bets 
 | `F` | Switch between a window and fullscreen |
 | `R` | Restart the match |
 | `ESC` | Quit |
+
+With more than one table, each key works on every table at once, and the keys are listed along the bottom of the window.
 
 #### ⚡ Run headless tests
 ```bash

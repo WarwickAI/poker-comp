@@ -20,7 +20,7 @@ from ..player import Blind, MyPlayer, Player
 
 
 # Each team's bot can be run in a container of its own, so that its code never runs on the organiser's computer. The engine
-# and the windows stay where they are: when it is a bot's turn, the engine sends its container the game state as a line of
+# and the window stay where they are: when it is a bot's turn, the engine sends its container the game state as a line of
 # JSON, and the bot's action comes back the same way. Nothing the bot sends is unpickled or run, it is only read as JSON.
 #
 # The containers are made from the competitions repo's Docker image, which its results/run.sh builds, with the same limits:
