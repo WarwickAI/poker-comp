@@ -38,6 +38,9 @@ NAME_SCROLL_PAUSE = 1.5  # Seconds it rests at each end
 ANIMATION = 0.35  # Seconds spent moving cards and chips at the start of each thing that happens
 HOLDS = {"deal": 0.7, "ante": 0.4, "blind": 0.3, "fold": 0.5, "check": 0.5, "call": 0.6, "raise": 0.8, "return": 0.6, "street": 0.9, "showdown": 1.2, "win": 1.8, "bust": 1.0}
 
+GAP = 8  # Pixels between the tables, and round the edge of the window, when it shows more than one
+FOOTER = 40  # With more than one table, the controls are shown once along the bottom of the window, in a strip this tall
+
 CONTROLS = "SPACE pause    LEFT / RIGHT step    UP / DOWN speed    N next hand    F fullscreen    R restart    ESC quit"
 
 
@@ -50,49 +53,74 @@ def ease(amount: float) -> float:
     return 1 - (1 - amount) ** 3
 
 
-class PokerRenderer:
-    def __init__(self, *, players: list[str], total_hands: int, fullscreen: bool = False, render_fps: int = 60, title: str = "WAI Poker", tile: tuple[int, int] = (0, 1)):
-        self.players = self.names(players)  # Who is at the table. Players can come and go between hands, so each hand says who was there.
-        self.total_hands = total_hands
+def best_grid(count: int, width: float, height: float) -> tuple[int, int, float]:
+    # The columns and rows which make count tables as big as they can be in a space, and how much each is scaled by to fit
+    def scale(columns: int) -> float:
+        rows = math.ceil(count / columns)
+        return min((width - GAP * (columns - 1)) / columns / WIDTH, (height - GAP * (rows - 1)) / rows / HEIGHT)
 
-        # Everything played so far, and where playback has got to in it
-        self.hands: list[dict] = []
-        self.hand = 0
-        self.frame = 0
-        self.clock = 0.0
+    columns = max(range(1, count + 1), key=scale)
+    return columns, math.ceil(count / columns), max(scale(columns), 0.0)
+
+
+def tile(count: int, left: int, top: int, width: int, height: int) -> list[tuple[int, int, int, int]]:
+    # Where each of count tables goes in a space, as the x, y, width and height of each. The grid is in the middle of the
+    # space, and a last row which isn't full is in the middle of its row.
+    columns, rows, scale = best_grid(count, width, height)
+    tile_width, tile_height = int(WIDTH * scale), int(HEIGHT * scale)
+    top += (height - rows * tile_height - (rows - 1) * GAP) // 2
+    tiles = []
+
+    for index in range(count):
+        row, column = divmod(index, columns)
+        in_row = min(columns, count - row * columns)
+        x = left + (width - in_row * tile_width - (in_row - 1) * GAP) // 2 + column * (tile_width + GAP)
+        tiles.append((x, top + row * (tile_height + GAP), tile_width, tile_height))
+
+    return tiles
+
+
+class Style:
+    # The colours and the ways of drawing text which the window and every table share
+    BACKGROUND = rl.Color(18, 18, 18, 255)
+    PANEL = rl.Color(28, 28, 27, 255)
+    PLATE = rl.Color(40, 40, 38, 255)
+    LINE = rl.Color(70, 70, 66, 255)
+    FELT = rl.Color(31, 115, 80, 255)
+    RAIL = rl.Color(59, 42, 32, 255)
+    TEXT = rl.Color(255, 255, 255, 255)
+    SOFT = rl.Color(195, 194, 183, 255)
+    MUTED = rl.Color(137, 135, 129, 255)
+    GOLD = rl.Color(244, 196, 48, 255)
+    WARNING = rl.Color(250, 178, 25, 255)
+    PLAYER_COLOURS = [rl.Color(*colour, 255) for colour in ((57, 135, 229), (217, 89, 38), (25, 158, 112), (201, 133, 0), (213, 81, 129), (0, 131, 0), (144, 133, 233), (230, 103, 103))]
+
+    def draw_text_centred(self, text: str, x: int, y: int, size: int, colour: rl.Color):
+        rl.draw_text(text, x - rl.measure_text(text, size) // 2, y, size, colour)
+
+    def draw_text_right(self, text: str, x: int, y: int, size: int, colour: rl.Color):
+        rl.draw_text(text, x - rl.measure_text(text, size), y, size, colour)
+
+
+class PokerWindow(Style):
+    # The window, which shows every table at once. With more than one, they are tiled in a grid, each as big as will fit, and the
+    # grid is laid out again whenever the window changes size or a table closes. The controls work on every table together.
+    def __init__(self, *, tables: dict[int, list[str]], total_hands: int, fullscreen: bool = False, render_fps: int = 60):
+        self.total_hands = total_hands
+        self.tables: dict[int, TableRenderer] = {}  # In the order of their numbers, which is the order they are tiled in
         self.speed = 1
         self.paused = False
-        self.finished = False
-        self.ending: tuple[str | None, list[str], bool, float | None] = (None, [], True, None)  # What to say once the last hand is over
-        self.ended_for = 0.0  # Seconds since the last hand finished being shown
-        self.step_requested = False
         self.restart_requested = False
-        self.prepared_hand = -1
-        self.log_lines: list[tuple[int, str, str]] = []
-        self.pot_chips: list[dict[int, int]] = []
-
-        self.BACKGROUND = rl.Color(18, 18, 18, 255)
-        self.PANEL = rl.Color(28, 28, 27, 255)
-        self.PLATE = rl.Color(40, 40, 38, 255)
-        self.LINE = rl.Color(70, 70, 66, 255)
-        self.FELT = rl.Color(31, 115, 80, 255)
-        self.RAIL = rl.Color(59, 42, 32, 255)
-        self.TEXT = rl.Color(255, 255, 255, 255)
-        self.SOFT = rl.Color(195, 194, 183, 255)
-        self.MUTED = rl.Color(137, 135, 129, 255)
-        self.GOLD = rl.Color(244, 196, 48, 255)
-        self.WARNING = rl.Color(250, 178, 25, 255)
-        self.PLAYER_COLOURS = [rl.Color(*colour, 255) for colour in ((57, 135, 229), (217, 89, 38), (25, 158, 112), (201, 133, 0), (213, 81, 129), (0, 131, 0), (144, 133, 233), (230, 103, 103))]
 
         rl.set_trace_log_level(rl.LOG_NONE)
         size, position = (WIDTH, HEIGHT), None
-        measured = not fullscreen and tile[1] > 1
+        measured = not fullscreen and len(tables) > 1
 
         if measured:
-            size, position = self.tile_layout(*tile)
+            size, position = self.measure(len(tables))
 
         rl.set_config_flags(rl.FLAG_WINDOW_RESIZABLE)
-        rl.init_window(*size, title)
+        rl.init_window(*size, "WAI Poker")
         rl.set_window_min_size(WIDTH // 2, HEIGHT // 2)
 
         if position is not None:
@@ -104,40 +132,32 @@ class PokerRenderer:
         if fullscreen:
             rl.toggle_borderless_windowed()
 
-        self.canvas = rl.load_render_texture(WIDTH * CANVAS_ZOOM, HEIGHT * CANVAS_ZOOM)
-        rl.set_texture_filter(self.canvas.texture, rl.TEXTURE_FILTER_BILINEAR)
         rl.set_target_fps(render_fps)
         self.window_initialized = True
 
         self.cards = self.load_sprites("cards.png")
         self.chips = self.load_sprites("chips.png")
+        self.reset(tables)
 
     @staticmethod
-    def tile_layout(index: int, count: int) -> tuple[tuple[int, int], tuple[int, int] | None]:
-        # With more than one table, the windows are laid out in a grid across the screen, each as big as will fit.
+    def measure(count: int) -> tuple[tuple[int, int], tuple[int, int] | None]:
+        # With more than one table, the window starts as big as the screen has room for, and just the size of the grid of tables.
         # raylib can only measure the screen once a window is open, so a hidden one is opened to do it and then closed.
         # The real window is then opened at the right size, because resizing it afterwards draws into only part of it on some screens.
         rl.set_config_flags(rl.FLAG_WINDOW_HIDDEN)
         rl.init_window(WIDTH // 2, HEIGHT // 2, "")
         monitor = rl.get_current_monitor()
         full_height = rl.get_monitor_height(monitor)
-        screen_width, screen_height = rl.get_monitor_width(monitor), full_height * 0.92  # Leaves room for title bars and a taskbar
+        screen_width, screen_height = rl.get_monitor_width(monitor), int(full_height * 0.92)  # Leaves room for a title bar and a taskbar
         rl.close_window()
 
         if screen_width <= 0 or screen_height <= 0:
             return (WIDTH, HEIGHT), None
 
-        def size(columns: int) -> float:
-            return min(screen_width / columns, screen_height / math.ceil(count / columns) * WIDTH / HEIGHT)
-
-        columns = max(range(1, count + 1), key=size)
-        width = max(int(size(columns)), WIDTH // 2)
-        height = width * HEIGHT // WIDTH
-        return (width, height), (index % columns * width, int(full_height * 0.04) + index // columns * height)
-
-    @staticmethod
-    def names(players: list[str]) -> list[str]:
-        return [name.encode("ascii", "replace").decode() for name in players]  # The font only has ASCII
+        columns, rows, scale = best_grid(count, screen_width - 2 * GAP, screen_height - GAP - FOOTER)
+        width = max(columns * int(WIDTH * scale) + (columns + 1) * GAP, WIDTH // 2)
+        height = max(rows * int(HEIGHT * scale) + rows * GAP + FOOTER, HEIGHT // 2)
+        return (width, height), ((screen_width - width) // 2, int(full_height * 0.04) + (screen_height - height) // 2)
 
     def load_sprites(self, name: str) -> rl.Texture:
         image = rl.load_image(str(Path(__file__).parent / "assets" / name))
@@ -149,8 +169,154 @@ class PokerRenderer:
 
     # ---- What the game loop calls
 
+    def reset(self, tables: dict[int, list[str]]):
+        # Starts again with these tables and the players at each, at the start and when the tournament restarts. Pausing and the
+        # speed stay as they were. When there is more than one table, each says which it is, even once it is the last one left.
+        for table in self.tables.values():
+            table.close()
+
+        labelled = len(tables) > 1
+        self.tables = {number: TableRenderer(window=self, number=number, players=players, total_hands=self.total_hands, labelled=labelled) for number, players in sorted(tables.items())}
+
     def is_window_open(self) -> bool:
         return self.window_initialized and not rl.window_should_close()
+
+    def should_restart(self) -> bool:
+        if self.restart_requested:
+            self.restart_requested = False
+            return True
+
+        return False
+
+    def update(self):
+        if not self.is_window_open():
+            return
+
+        self.handle_keys()
+
+        for table in self.tables.values():
+            table.update()
+
+        for number in [number for number, table in self.tables.items() if table.should_close()]:
+            self.tables.pop(number).close()  # The tables which are left are laid out again to fill the window
+
+        self.draw()
+
+    def close(self):
+        if self.window_initialized:
+            for table in self.tables.values():
+                table.close()
+
+            self.tables = {}
+            rl.unload_texture(self.cards)
+            rl.unload_texture(self.chips)
+            rl.close_window()
+            self.window_initialized = False
+
+    def handle_keys(self):
+        pressed = lambda key: rl.is_key_pressed(key) or rl.is_key_pressed_repeat(key)
+        tables = self.tables.values()
+
+        if rl.is_key_pressed(rl.KEY_F) or rl.is_key_pressed(rl.KEY_F11):
+            rl.toggle_borderless_windowed()
+
+        if rl.is_key_pressed(rl.KEY_R):
+            self.restart_requested = True
+
+        if rl.is_key_pressed(rl.KEY_SPACE):
+            self.paused = not self.paused
+
+        if pressed(rl.KEY_UP):
+            self.speed = min(self.speed + 1, len(SPEEDS) - 1)
+
+        if pressed(rl.KEY_DOWN):
+            self.speed = max(self.speed - 1, 0)
+
+        if not any(table.hands for table in tables):
+            return
+
+        if pressed(rl.KEY_RIGHT):
+            self.paused = True
+
+            for table in tables:
+                table.step_forward()
+
+        if pressed(rl.KEY_LEFT):
+            self.paused = True
+
+            for table in tables:
+                table.step_backward()
+
+        if rl.is_key_pressed(rl.KEY_N):
+            for table in tables:
+                table.skip_hand()
+
+    # ---- Drawing
+
+    def draw(self):
+        # Each table is drawn onto a canvas of its own, and then the canvases are stretched over their places in the window
+        tables = list(self.tables.values())
+        tiled = len(tables) > 1
+
+        for table in tables:
+            table.draw(footer=not tiled)
+
+        width, height = rl.get_screen_width(), rl.get_screen_height()
+        rl.begin_drawing()
+        rl.clear_background(self.BACKGROUND)
+
+        if tiled:
+            for table, (x, y, tile_width, tile_height) in zip(tables, tile(len(tables), GAP, GAP, width - 2 * GAP, height - GAP - FOOTER)):
+                table.show(rl.Rectangle(x, y, tile_width, tile_height))
+                rl.draw_rectangle_lines_ex(rl.Rectangle(x - 1, y - 1, tile_width + 2, tile_height + 2), 1, self.LINE)
+
+            self.draw_footer(GAP + 16, width - GAP - 16, height)
+
+        elif tables:
+            scale = min(width / WIDTH, height / HEIGHT)
+            target = rl.Rectangle((width - WIDTH * scale) / 2, (height - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale)
+            rl.draw_rectangle(int(target.x + TABLE_WIDTH * scale), 0, width, height, self.PANEL)  # Carries the panel on to the edges of the window
+            tables[0].show(target)
+
+        rl.end_drawing()
+
+    def draw_footer(self, left: int, right: int, bottom: int):
+        # The controls and the speed, along the bottom of the only table, or of the window when there is more than one
+        rl.draw_text(CONTROLS, left, bottom - 28, 10, self.MUTED)
+        state = "PAUSED" if self.paused else f"{SPEEDS[self.speed]:g}x"
+        self.draw_text_right(state, right, bottom - 33, 20, self.WARNING if self.paused else self.SOFT)
+
+
+class TableRenderer(Style):
+    # One table, which is played back and drawn onto a canvas of its own for the window to show
+    def __init__(self, *, window: PokerWindow, number: int, players: list[str], total_hands: int, labelled: bool = False):
+        self.window = window  # Which has the controls, as they work on every table together, and the pictures of the cards and chips
+        self.number = number
+        self.label = f"TABLE {number}" if labelled else None
+        self.players = self.names(players)  # Who is at the table. Players can come and go between hands, so each hand says who was there.
+        self.total_hands = total_hands
+
+        # Everything played so far, and where playback has got to in it
+        self.hands: list[dict] = []
+        self.hand = 0
+        self.frame = 0
+        self.clock = 0.0
+        self.finished = False
+        self.ending: tuple[str | None, list[str], bool, float | None] = (None, [], True, None)  # What to say once the last hand is over
+        self.ended_for = 0.0  # Seconds since the last hand finished being shown
+        self.step_requested = False
+        self.prepared_hand = -1
+        self.log_lines: list[tuple[int, str, str]] = []
+        self.pot_chips: list[dict[int, int]] = []
+
+        self.canvas = rl.load_render_texture(WIDTH * CANVAS_ZOOM, HEIGHT * CANVAS_ZOOM)
+        rl.set_texture_filter(self.canvas.texture, rl.TEXTURE_FILTER_BILINEAR)
+
+    @staticmethod
+    def names(players: list[str]) -> list[str]:
+        return [name.encode("ascii", "replace").decode() for name in players]  # The font only has ASCII
+
+    # ---- What the window calls
 
     def needs_hand(self) -> bool:
         # True once everything pushed so far has been shown
@@ -160,7 +326,7 @@ class PokerRenderer:
         if not self.hands:
             return True
 
-        return self.at_end() and (self.step_requested or (not self.paused and self.clock >= self.duration()))
+        return self.at_end() and (self.step_requested or (not self.window.paused and self.clock >= self.duration()))
 
     def push(self, hand: dict):
         self.hands.append(hand)
@@ -171,7 +337,7 @@ class PokerRenderer:
 
     def finish(self, title: str | None = None, lines: list[str] = (), hints: bool = True, close_after: float | None = None):
         # There are no more hands to come. Once the last one is over, the title and lines are shown over the table, or who won
-        # if there is no title. With close_after, the window closes by itself that many seconds later.
+        # if there is no title. With close_after, the table leaves the window by itself that many seconds later.
         self.finished = True
         self.ending = (title, list(lines), hints, close_after)
 
@@ -179,52 +345,21 @@ class PokerRenderer:
         close_after = self.ending[3]
         return close_after is not None and self.ended_for >= close_after
 
-    def should_restart(self) -> bool:
-        if self.restart_requested:
-            self.restart_requested = False
-            return True
-
-        return False
-
-    def reset(self, players: list[str] | None = None):
-        if players is not None:
-            self.players = self.names(players)
-
-        self.hands = []
-        self.hand = 0
-        self.frame = 0
-        self.clock = 0.0
-        self.finished = False
-        self.ending = (None, [], True, None)
-        self.ended_for = 0.0
-        self.step_requested = False
-        self.prepared_hand = -1
-
     def update(self):
-        if not self.is_window_open():
-            return
-
-        self.handle_keys()
-
         if self.hands:
-            self.clock += rl.get_frame_time() * SPEEDS[self.speed]
+            self.clock += rl.get_frame_time() * SPEEDS[self.window.speed]
 
             if self.clock >= self.duration():
-                if self.paused or not self.advance():
+                if self.window.paused or not self.advance():
                     self.clock = self.duration()
 
         if self.ended():
             self.ended_for += rl.get_frame_time()
 
-        self.draw()
-
     def close(self):
-        if self.window_initialized:
-            rl.unload_texture(self.cards)
-            rl.unload_texture(self.chips)
+        if self.canvas is not None:
             rl.unload_render_texture(self.canvas)
-            rl.close_window()
-            self.window_initialized = False
+            self.canvas = None
 
     # ---- Playback
 
@@ -261,54 +396,41 @@ class PokerRenderer:
 
         self.clock = self.duration()
 
-    def handle_keys(self):
-        pressed = lambda key: rl.is_key_pressed(key) or rl.is_key_pressed_repeat(key)
+    # ---- The controls, which the window uses on every table at once
 
-        if rl.is_key_pressed(rl.KEY_F) or rl.is_key_pressed(rl.KEY_F11):
-            rl.toggle_borderless_windowed()
-
-        if rl.is_key_pressed(rl.KEY_R):
-            self.restart_requested = True
-
-        if rl.is_key_pressed(rl.KEY_SPACE):
-            self.paused = not self.paused
-
-        if pressed(rl.KEY_UP):
-            self.speed = min(self.speed + 1, len(SPEEDS) - 1)
-
-        if pressed(rl.KEY_DOWN):
-            self.speed = max(self.speed - 1, 0)
-
-        if not self.hands:
-            return
-
-        if pressed(rl.KEY_RIGHT):
-            self.paused = True
+    def step_forward(self):
+        if self.hands:
             self.step_requested = not self.advance() and not self.finished
 
-        if pressed(rl.KEY_LEFT):
-            self.paused = True
+    def step_backward(self):
+        if self.hands:
             self.step_requested = False
             self.step_back()
 
-        if rl.is_key_pressed(rl.KEY_N):
-            if self.hand < len(self.hands) - 1:
-                self.hand += 1
-                self.frame = 0
-                self.clock = 0.0
-            else:
-                self.frame = len(self.frames()) - 1
-                self.clock = self.duration()
-                self.step_requested = self.paused and not self.finished
+    def skip_hand(self):
+        if not self.hands:
+            return
+
+        if self.hand < len(self.hands) - 1:
+            self.hand += 1
+            self.frame = 0
+            self.clock = 0.0
+        else:
+            self.frame = len(self.frames()) - 1
+            self.clock = self.duration()
+            self.step_requested = self.window.paused and not self.finished
 
     # ---- Drawing
 
-    def draw(self):
-        # The picture is drawn onto a canvas of a fixed size, which is then stretched over the window
+    def draw(self, footer: bool = True):
+        # The picture is drawn onto a canvas of a fixed size, which the window then stretches over the table's place in it
         rl.begin_texture_mode(self.canvas)
         rl.begin_mode_2d(rl.Camera2D(rl.Vector2(0, 0), rl.Vector2(0, 0), 0, CANVAS_ZOOM))
         rl.clear_background(self.BACKGROUND)
         self.draw_table()
+
+        if self.label:
+            rl.draw_text(self.label, 24, 20, 30, self.SOFT)
 
         if self.hands:
             hand = self.hands[self.hand]
@@ -334,19 +456,16 @@ class PokerRenderer:
             if self.ended():
                 self.draw_match_over(None)
 
-        self.draw_footer()
+        if footer:
+            self.window.draw_footer(24, TABLE_WIDTH - 24, HEIGHT)
+
         rl.end_mode_2d()
         rl.end_texture_mode()
 
-        scale = min(rl.get_screen_width() / WIDTH, rl.get_screen_height() / HEIGHT)
-        target = rl.Rectangle((rl.get_screen_width() - WIDTH * scale) / 2, (rl.get_screen_height() - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale)
+    def show(self, target: rl.Rectangle):
+        # Stretches the canvas over a part of the window
         source = rl.Rectangle(0, 0, WIDTH * CANVAS_ZOOM, -HEIGHT * CANVAS_ZOOM)  # Canvases are stored upside down
-
-        rl.begin_drawing()
-        rl.clear_background(self.BACKGROUND)
-        rl.draw_rectangle(int(target.x + TABLE_WIDTH * scale), 0, rl.get_screen_width(), rl.get_screen_height(), self.PANEL)  # Carries the panel on to the edges of the window
         rl.draw_texture_pro(self.canvas.texture, source, target, rl.Vector2(0, 0), 0, rl.WHITE)
-        rl.end_drawing()
 
     def draw_table(self):
         rl.draw_rectangle_rounded(rl.Rectangle(100, 110, 800, 420), 1.0, 48, self.RAIL)
@@ -582,11 +701,6 @@ class PokerRenderer:
 
             y += height
 
-    def draw_footer(self):
-        rl.draw_text(CONTROLS, 24, 692, 10, self.MUTED)
-        state = "PAUSED" if self.paused else f"{SPEEDS[self.speed]:g}x"
-        self.draw_text_right(state, TABLE_WIDTH - 24, 687, 20, self.WARNING if self.paused else self.SOFT)
-
     def draw_match_over(self, now: dict | None):
         rl.draw_rectangle(0, 0, TABLE_WIDTH, HEIGHT, rl.Color(0, 0, 0, 170))
         title, lines, hints, _ = self.ending
@@ -626,7 +740,7 @@ class PokerRenderer:
     def draw_card(self, code: str, x: float, y: float, brightness: float, opacity: float):
         source = rl.Rectangle(48 * TEXTURE_ZOOM * RANKS.index(code[0]), 64 * TEXTURE_ZOOM * SUIT_ROWS[code[1]], 48 * TEXTURE_ZOOM, 64 * TEXTURE_ZOOM)
         tint = rl.Color(int(brightness), int(brightness), int(brightness), int(255 * opacity))
-        rl.draw_texture_pro(self.cards, source, rl.Rectangle(round(x), round(y), CARD_WIDTH, CARD_HEIGHT), rl.Vector2(0, 0), 0, tint)
+        rl.draw_texture_pro(self.window.cards, source, rl.Rectangle(round(x), round(y), CARD_WIDTH, CARD_HEIGHT), rl.Vector2(0, 0), 0, tint)
 
     def chips_for(self, amount: int) -> list[tuple[int, int]]:
         # The chips which are shown for an amount: its two biggest kinds of chip, as their place in CHIPS and how many of them
@@ -650,7 +764,7 @@ class PokerRenderer:
             _, row, half = CHIPS[kind]
             height = 0 if count == 1 else 1 if count <= 3 else 2 if count <= 7 else 3
             source = rl.Rectangle(48 * TEXTURE_ZOOM * (4 * half + height), 48 * TEXTURE_ZOOM * row, 32 * TEXTURE_ZOOM, 48 * TEXTURE_ZOOM)
-            rl.draw_texture_pro(self.chips, source, rl.Rectangle(left + CHIP_SPACING * index, int(y) + 16 - CHIP_HEIGHT, CHIP_WIDTH, CHIP_HEIGHT), rl.Vector2(0, 0), 0, rl.fade(self.TEXT, opacity))
+            rl.draw_texture_pro(self.window.chips, source, rl.Rectangle(left + CHIP_SPACING * index, int(y) + 16 - CHIP_HEIGHT, CHIP_WIDTH, CHIP_HEIGHT), rl.Vector2(0, 0), 0, rl.fade(self.TEXT, opacity))
 
         rl.draw_rectangle_rounded(rl.Rectangle(left + chips_width, int(y) - 14, text_width, 28), 1.0, 12, rl.Color(0, 0, 0, int(105 * opacity)))
         rl.draw_text(text, left + chips_width + 8, int(y) - 9, 20, rl.fade(self.TEXT, opacity))
@@ -669,12 +783,6 @@ class PokerRenderer:
 
         colour = self.BACKGROUND if gold or bright else self.MUTED if muted else self.TEXT
         rl.draw_text(text, int(box.x) + 10, int(box.y) + 4, 20, rl.fade(colour, arrived))
-
-    def draw_text_centred(self, text: str, x: int, y: int, size: int, colour: rl.Color):
-        rl.draw_text(text, x - rl.measure_text(text, size) // 2, y, size, colour)
-
-    def draw_text_right(self, text: str, x: int, y: int, size: int, colour: rl.Color):
-        rl.draw_text(text, x - rl.measure_text(text, size), y, size, colour)
 
     def draw_name(self, name: str, x: int, y: int, width: int, colour: rl.Color):
         # A name which is too long for its space scrolls through it and back, resting at each end

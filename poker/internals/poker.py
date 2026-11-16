@@ -19,8 +19,8 @@ from .score import score as score_ai
 from .tournament import TABLE_SIZE, Tournament
 
 
-STARTING_PATH = list(sys.path)  # The module search path from before any bot is loaded, for the windows to start with
-OPEN_FILES = 4096  # Enough files for every team's container to keep a few open, and every table's window
+STARTING_PATH = list(sys.path)  # The module search path from before any bot is loaded, for the window to start with
+OPEN_FILES = 4096  # Enough files for every team's container to keep a few open, and the window
 
 
 def load_ais(specs: list[str], least: int = 2, taken: list[str] = ()) -> list[tuple[str, AI]]:
@@ -110,7 +110,7 @@ def load_snapshots(folder: str) -> tuple[list[tuple[str, Path]], dict[str, Team]
 def write_results(path: str, tournament: Tournament, teams: dict[str, Team], seed: int | None):
     # Writes everyone's result, for the website's db/record-tournament.ts to add to the leaderboard. Players who aren't one
     # of the teams, such as example bots added to make up the numbers, are listed without a repo and aren't recorded.
-    complete = tournament.is_over()  # False if it was stopped early, such as by closing a window
+    complete = tournament.is_over()  # False if it was stopped early, such as by closing the window
 
     results = {
         "playedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -230,7 +230,7 @@ def ordinal(number: int) -> str:
 
 
 def ending(tournament: Tournament) -> list[str]:
-    # The lines shown in a window once the tournament is over
+    # The lines shown over each table once the tournament is over
     standings = tournament.standings()
     most = standings[0].stack
     leaders = [result.name for result in standings if result.stack == most]
@@ -282,20 +282,20 @@ def run(args: argparse.Namespace):
 
 def watch(args: argparse.Namespace, ais: list[tuple[str, AI]], teams: dict[str, Team], rules: Rules):
     from .render import CONTROLS  # Imported here so that poker test works without a screen
-    from .window import Windows
+    from .window import Window
 
     print(f"Controls: {CONTROLS}")
     tournament = new_tournament(args, ais, rules)
     title = "MATCH OVER" if len(tournament.tables) == 1 else "TOURNAMENT OVER"
-    windows = Windows(total_hands=rules.hands, fullscreen=args.fullscreen, sys_path=STARTING_PATH)
-    told: dict[int, str] = {}  # What each window has been told about how its table ended
+    window = Window(total_hands=rules.hands, fullscreen=args.fullscreen, sys_path=STARTING_PATH)
+    told: dict[int, str] = {}  # What the window has been told about how each table ended
 
-    def tell_windows():
-        # Lets each window know once its table has nothing more to play, so it can say why after its last hand
+    def tell_window():
+        # Lets the window know once a table has nothing more to play, so it can say why after the table's last hand
         over = tournament.is_over()
 
         for table in tournament.tables:
-            # A table which is down to one player is still in play, as players may be moved to it, so its window carries on
+            # A table which is down to one player is still in play, as players may be moved to it, so it stays in the window
             if table.closed:
                 news = "closed"
             elif over:
@@ -312,17 +312,17 @@ def watch(args: argparse.Namespace, ais: list[tuple[str, AI]], teams: dict[str, 
 
             if news == "closed":
                 moved = " and ".join(str(number) for number in table.moved_to)
-                windows.send(table.number, "finish", "TABLE CLOSED", [f"Everyone here moved to table{'s' if len(table.moved_to) > 1 else ''} {moved}"], False, 4.0)
+                window.send("finish", table.number, "TABLE CLOSED", [f"Everyone here moved to table{'s' if len(table.moved_to) > 1 else ''} {moved}"], False, 4.0)
             elif news == "over":
-                windows.send(table.number, "finish", title, ending(tournament), True, None)
+                window.send("finish", table.number, title, ending(tournament), True, None)
             else:
-                windows.send(table.number, "finish", "TABLE FINISHED", [f"All {rules.hands} hands have been played here", "Waiting for the other tables"], True, None)
+                window.send("finish", table.number, "TABLE FINISHED", [f"All {rules.hands} hands have been played here", "Waiting for the other tables"], True, None)
 
     def seating() -> dict[int, list[str]]:
         return {table.number: [seat.name for seat in table.match.seats] for table in tournament.tables}
 
-    windows.start(seating())
-    waiting: list[int] = []  # Tables whose windows are ready for their next hand, in the order they asked
+    window.start(seating())
+    waiting: list[int] = []  # Tables which are ready for their next hand, in the order they asked
 
     def deal_to_waiting():
         # The tables play hand for hand, so a table can be ready before it may deal. Every hand played may let another table go.
@@ -335,19 +335,20 @@ def watch(args: argparse.Namespace, ais: list[tuple[str, AI]], teams: dict[str, 
                 table = tournament.tables[number - 1]
 
                 if tournament.is_over() or not table.in_play():
-                    waiting.remove(number)  # It has nothing more to play, and tell_windows says why. A table which is only waiting for players stays.
+                    waiting.remove(number)  # It has nothing more to play, and tell_window says why. A table which is only waiting for players stays.
 
                 elif tournament.may_deal(table):
                     waiting.remove(number)
-                    windows.send(number, "hand", tournament.play_hand(table))
-                    tell_windows()
+                    window.send("hand", number, tournament.play_hand(table))
+                    tell_window()
                     dealt = True
 
     try:
-        # Each window asks for its next hand once it has shown the last one, and the hand is played just before it is sent.
-        # Moving players between tables happens straight after a hand, while every table is between hands.
-        while windows.open:
-            event = windows.next_event()
+        # Each table in the window asks for its next hand once it has shown the last one, and the hand is played just before it is
+        # sent. Moving players between tables happens straight after a hand, while every table is between hands. Closing the
+        # window ends everything, as ESC always has.
+        while window.open:
+            event = window.next_event()
 
             if event is None:
                 continue
@@ -364,19 +365,13 @@ def watch(args: argparse.Namespace, ais: list[tuple[str, AI]], teams: dict[str, 
                 tournament = new_tournament(args, ais, rules)
                 told = {}
                 waiting = []
-                windows.start(seating())
-
-            elif message == "lost":
-                windows.open_window(number, seating()[number])
-
-            elif message == "closed" and told.get(number) != "closed":
-                break  # Closing the window of a table which is still playing ends everything, as ESC always has
+                window.start(seating())
 
     except KeyboardInterrupt:
-        print()  # Ctrl+C stops the windows, and the results so far are still printed
+        print()  # Ctrl+C stops the window, and the results so far are still printed
 
     finally:
-        windows.close()
+        window.close()
 
     print_standings(tournament)
 
@@ -477,7 +472,7 @@ def main(argv: list[str] | None = None):
     snapshots.add_argument("--logs", default="bot-logs", metavar="FOLDER", help="where to keep what each team's bot prints (bot-logs if left out)")
     snapshots.add_argument("--no-sandbox", action="store_true", help="run the teams' bots here instead of in containers. Their code can then do anything you can, so only use this for bots you trust")
 
-    run_parser = commands.add_parser("run", parents=[seeded, snapshots], help="play a match and watch it, with a window for each table")
+    run_parser = commands.add_parser("run", parents=[seeded, snapshots], help="play a match and watch it, with every table in one window")
     run_parser.add_argument("ais", nargs="*", metavar="AI", help=ais_help)
     run_parser.add_argument("--results", metavar="FILE", help="write everyone's result to this file, for the website's db/record-tournament.ts")
     run_parser.add_argument("--fullscreen", action="store_true", help="start with the window filling the screen")
